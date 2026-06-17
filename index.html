@@ -828,7 +828,7 @@
     var supabase = (function() {
         if (window.supabase && typeof window.supabase.createClient === 'function') {
             try {
-                return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: window.sessionStorage, autoRefreshToken: true, persistSession: true } });
+                return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: window.localStorage, autoRefreshToken: true, persistSession: true } });
             } catch(e) {
                 console.error("Erro ao inicializar o Supabase:", e);
             }
@@ -2502,9 +2502,30 @@
     }
 
     // --- 8. INIT PERSISTENCE & AUTHENTICATION ---
-    function mostrarTelaPrimeiroAcesso() {
+    function mostrarTelaPrimeiroAcesso(isInvite = false) {
        document.getElementById('box-login').classList.add('hidden');
        document.getElementById('box-cadastro').classList.remove('hidden');
+       
+       const txtEmailCadastro = document.getElementById('txtEmailCadastro');
+       if (txtEmailCadastro) {
+           const urlString = window.location.href + window.location.hash;
+           const temConviteUrl = urlString.includes('type=invite') || urlString.includes('access_token=') || urlString.includes('type=signup') || urlString.includes('type=recovery');
+           const aplicarDisabled = isInvite || temConviteUrl;
+           
+           if (aplicarDisabled) {
+               txtEmailCadastro.disabled = true;
+               txtEmailCadastro.readOnly = true;
+               txtEmailCadastro.classList.add('bg-slate-200', 'cursor-not-allowed', 'font-semibold', 'text-slate-500');
+               if (!txtEmailCadastro.value || txtEmailCadastro.value.trim() === '') {
+                   txtEmailCadastro.placeholder = 'Carregando e-mail do convite...';
+               }
+           } else {
+               txtEmailCadastro.disabled = false;
+               txtEmailCadastro.readOnly = false;
+               txtEmailCadastro.classList.remove('bg-slate-200', 'cursor-not-allowed', 'font-semibold', 'text-slate-500');
+               txtEmailCadastro.placeholder = 'roberto@empresa.com';
+           }
+       }
     }
 
     function mostrarTelaLogin() {
@@ -2626,6 +2647,7 @@
 
         try {
             showToast('Definindo cadastro...', 'info');
+             // Realizar atualização de senha
             const { data, error } = await supabase.auth.updateUser({
                 password: senha,
                 data: { full_name: nome }
@@ -2637,6 +2659,7 @@
             }
 
             if (data && data.user) {
+                if (window.history && window.history.replaceState) { window.history.replaceState(null, "", window.location.pathname); }
                 showToast('Cadastro definido e ativado com sucesso!', 'success');
                 logarUsuario(nome);
             }
@@ -2685,7 +2708,16 @@
         if (txtSenha) txtSenha.value = '';
         
         document.getElementById('txtNomeUsuario').value = '';
-        document.getElementById('txtEmailCadastro').value = '';
+        
+        const txtEmailCadastro = document.getElementById('txtEmailCadastro');
+        if (txtEmailCadastro) {
+            txtEmailCadastro.value = '';
+            txtEmailCadastro.disabled = false;
+            txtEmailCadastro.readOnly = false;
+            txtEmailCadastro.classList.remove('bg-slate-200', 'cursor-not-allowed', 'font-semibold', 'text-slate-500');
+            txtEmailCadastro.placeholder = 'roberto@empresa.com';
+        }
+        
         document.getElementById('txtNovaSenha').value = '';
         document.getElementById('txtConfirmarSenha').value = '';
         
@@ -2694,19 +2726,6 @@
         
         mostrarTelaLogin();
         showToast('Sessão encerrada.', 'warning');
-        return;
-       document.getElementById('txtEmail').value = '';
-       document.getElementById('txtSenha').value = '';
-       document.getElementById('txtNomeUsuario').value = '';
-       document.getElementById('txtEmailCadastro').value = '';
-       document.getElementById('txtNovaSenha').value = '';
-       document.getElementById('txtConfirmarSenha').value = '';
-       
-       document.getElementById('tela-dashboard').classList.add('hidden');
-       document.getElementById('tela-autenticacao').classList.remove('hidden');
-       
-       mostrarTelaLogin();
-       showToast('Sessão encerrada.', 'warning');
     }
 
     function syncReferencia(val) {
@@ -2720,10 +2739,29 @@
 
     async function verificarAutenticacao() {
         if (!supabase) return false;
+        
+        // Se for um link de convite ou recuperação de senha, não devemos redirecionar direto para o dashboard
+        const urlString = window.location.href + window.location.hash;
+        const hasInviteOrRecovery = urlString.includes('type=invite') || urlString.includes('type=recovery') || urlString.includes('type=signup') || urlString.includes('access_token=');
+        
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (session && session.user) {
-                const nome = session.user.user_metadata?.full_name || session.user.email || 'Operador';
+            const user = session?.user || (await supabase.auth.getUser())?.data?.user;
+            
+            if (user) {
+                if (hasInviteOrRecovery) {
+                    mostrarTelaPrimeiroAcesso(true);
+                    const txtEmailCadastro = document.getElementById('txtEmailCadastro');
+                    if (txtEmailCadastro) {
+                        txtEmailCadastro.value = user.email || '';
+                        txtEmailCadastro.disabled = true;
+                        txtEmailCadastro.readOnly = true;
+                        txtEmailCadastro.classList.add('bg-slate-200', 'cursor-not-allowed', 'font-semibold', 'text-slate-500');
+                    }
+                    showToast('Por favor, defina seu nome e senha para o primeiro acesso.', 'info');
+                    return false;
+                }
+                const nome = user.user_metadata?.full_name || user.email || 'Operador';
                 logarUsuario(nome);
                 return true;
             }
@@ -2743,20 +2781,6 @@
         }
         
         return false;
-       if (salvo) {
-           try {
-               const user = JSON.parse(salvo);
-               if (user && user.nome) {
-                   logarUsuario(user.nome);
-                   return true;
-               }
-           } catch(e) {}
-       }
-       
-       // Not authenticated - display auth screen
-       document.getElementById('tela-autenticacao').classList.remove('hidden');
-       document.getElementById('tela-dashboard').classList.add('hidden');
-       return false;
     }
 
     // On Load
@@ -2768,16 +2792,53 @@
 
        // Supabase Auth State Transition listener (Captures invite links)
        if (supabase) {
-           supabase.auth.onAuthStateChange((event, session) => {
-               const hasInvite = window.location.href.includes('type=invite') || window.location.hash.includes('type=invite');
-               if (hasInvite || event === 'PASSWORD_RECOVERY') {
+           // Se detectar um token ou fluxo de convite na URL, aplicar tela de Primeiro Acesso e buscar proativamente
+           const urlString = window.location.href + window.location.hash;
+           const temTokenUrl = urlString.includes('type=invite') || urlString.includes('access_token=') || urlString.includes('type=signup') || urlString.includes('type=recovery');
+           
+           if (temTokenUrl) {
+               mostrarTelaPrimeiroAcesso(true);
+               
+               let tentativas = 0;
+               const intervalId = setInterval(async () => {
+                   tentativas++;
+                   try {
+                       const { data: { session } } = await supabase.auth.getSession();
+                       const user = session?.user || (await supabase.auth.getUser())?.data?.user;
+                       
+                       if (user && user.email) {
+                           const txtEmailCadastro = document.getElementById('txtEmailCadastro');
+                           if (txtEmailCadastro) {
+                               txtEmailCadastro.value = user.email;
+                               txtEmailCadastro.disabled = true;
+                               txtEmailCadastro.readOnly = true;
+                               txtEmailCadastro.classList.add('bg-slate-200', 'cursor-not-allowed', 'font-semibold', 'text-slate-500');
+                           }
+                           clearInterval(intervalId);
+                       }
+                   } catch (e) {
+                       console.error("Erro ao obter dados do usuário convidado na inicialização:", e);
+                   }
+                   if (tentativas > 25) {
+                       clearInterval(intervalId);
+                   }
+               }, 200);
+           }
+
+           supabase.auth.onAuthStateChange(async (event, session) => {
+               const urlString = window.location.href + window.location.hash;
+               const hasInvite = urlString.includes('type=invite') || urlString.includes('access_token=') || urlString.includes('type=signup') || event === 'PASSWORD_RECOVERY';
+               if (hasInvite) {
                    mostrarTelaPrimeiroAcesso(true);
-                   if (session && session.user) {
+                   
+                   const user = session?.user || (await supabase.auth.getUser())?.data?.user;
+                   if (user && user.email) {
                        const txtEmailCadastro = document.getElementById('txtEmailCadastro');
                        if (txtEmailCadastro) {
-                           txtEmailCadastro.value = session.user.email || '';
+                           txtEmailCadastro.value = user.email;
                            txtEmailCadastro.disabled = true;
-                           txtEmailCadastro.classList.add('bg-slate-200', 'cursor-not-allowed');
+                           txtEmailCadastro.readOnly = true;
+                           txtEmailCadastro.classList.add('bg-slate-200', 'cursor-not-allowed', 'font-semibold', 'text-slate-500');
                        }
                    }
                }
