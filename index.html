@@ -1075,9 +1075,13 @@
        let refSelecionada = document.getElementById('txtReferencia').value;
 
        if (numNota && cnpj && refSelecionada) {
-           let isDupe = dbNotas.some(n => n.cnpj === cnpj && n.numNota === numNota && n.referencia === refSelecionada);
+           let isDupe = dbNotas.some(n => {
+                let noteCnpjRaw = String(n.cnpj || '').replace(/[^\d]+/g, '');
+                let cnpjRaw = String(cnpj || '').replace(/[^\d]+/g, '');
+                return noteCnpjRaw === cnpjRaw && String(n.numNota || '').trim() === numNota;
+            });
            if (isDupe) {
-               showToast(`ATENÇÃO: Nota fiscal nº ${numNota} já consta no sistema para este CNPJ no período ${refSelecionada}!`, 'error');
+               showToast(`ATENÇÃO: Nota fiscal nº ${numNota} já cadastrada para esta Empresa/Emitente (CNPJ: ${mascararCNPJ(cnpj)})!`, 'error');
                const form = document.getElementById('formLancarNota');
                form.classList.add('ring-4', 'ring-red-500', 'transition-all', 'duration-200');
                
@@ -1476,13 +1480,49 @@
        // c) Validação: Duplicidade de Nota no Período
        let numNotaLimpo = iptNota.value.replace(/^0+/, '').trim() || '0';
        let isDupe = false;
+        
+        // 1. Validar duplicidade na base local (dbNotas)
+        if (dbNotas && dbNotas.length > 0) {
+            isDupe = dbNotas.some(n => {
+                let noteCnpjRaw = String(n.cnpj || '').replace(/[^\d]+/g, '');
+                return noteCnpjRaw === rawCnpj && String(n.numNota || '').trim() === numNotaLimpo;
+            });
+        }
+        
+        // 2. Validar duplicidade em tempo real consultando o Supabase
+        if (!isDupe && supabase) {
+            try {
+                const { data: existingNote, error: checkError } = await supabase
+                    .from('notas_fiscais')
+                    .select('id')
+                    .eq('numero_nota', numNotaLimpo)
+                    .eq('empresa_cnpj', rawCnpj)
+                    .limit(1);
+                
+                if (existingNote && existingNote.length > 0) {
+                    isDupe = true;
+                }
+            } catch (err) {
+                console.error("Erro ao validar duplicidade no banco:", err);
+            }
+        }
+        
+        if (isDupe) {
+           showToast(`Transação Negada: Nota fiscal nº ${numNotaLimpo} já consta no sistema para esta Empresa/Fornecedor (CNPJ: ${mascararCNPJ(rawCnpj)}).`, 'error');
+           iptNota.focus();
+           return;
+        }
+        
+        /* Skip the original check
+        let originalIsDupeCheckPlaceholder = false;
+        if (originalIsDupeCheckPlaceholder) {
        if (isDupe) {
           showToast(`Transação Negada: Nota fiscal já consta no sistema para este CNPJ no período ${refSelecionada}.`, 'error');
           iptNota.focus();
           return;
        }
 
-       // Validations Passed. Execute Save Flow.
+       */ // Validations Passed. Execute Save Flow.
 
        // 1. Cadastra empresa se for nova
        let isEmpresaNova = false; try { const { data } = await supabase.from('empresas').select('*').eq('cnpj', rawCnpj).maybeSingle(); if (!data) { await supabase.from('empresas').insert([{ cnpj: rawCnpj, razao_social: titleCase(iptRazaoSocial.value) }]); } } catch(e) {} let dummyVal = false;
