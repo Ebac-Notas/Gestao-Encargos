@@ -1,0 +1,3102 @@
+<!doctype html>
+<html lang="pt-BR" style="height: 100%; margin: 0;">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema de Gestão Fiscal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <style>
+    body { margin: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    
+    th, td { border: 1px solid #cbd5e1; }
+    th { background-color: #e2e8f0; font-weight: 600; color: #334155; }
+    
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .aba-ativa {
+      background-color: #ffffff;
+      color: #1e293b;
+      border-top: 3px solid #059669;
+      border-bottom: 2px solid #ffffff;
+      margin-bottom: -2px;
+      font-weight: 700;
+      z-index: 10;
+    }
+    
+    .aba-inativa {
+      background-color: #f8fafc;
+      color: #64748b;
+      border-top: 3px solid transparent;
+      border-bottom: 2px solid transparent;
+    }
+    .aba-inativa:hover {
+      background-color: #f1f5f9;
+      color: #334155;
+    }
+    
+    @media print {
+      body * { visibility: hidden; }
+      #tab-notas, #tab-notas * { visibility: visible; }
+      #tab-notas { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: block; overflow: visible; }
+      nav, header, button, .aba-conteudo:not(#tab-notas), .btn-acao { display: none !important; }
+      #tab-notas .flex-1, #tab-notas .overflow-auto { overflow: visible !important; }
+      #tableNotas { width: 100%; }
+    }
+
+    /* Full Click Calendar Picker Style */
+    .full-click-picker {
+      position: relative;
+    }
+    .full-click-picker input[type="month"] {
+      position: relative;
+    }
+    .full-click-picker input[type="month"]::-webkit-calendar-picker-indicator {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      opacity: 0 !important;
+      cursor: pointer !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 flex flex-col h-full overflow-hidden text-sm">
+
+  <!-- DASHBOARD PRINCIPAL (INICIALMENTE ESCONDIDO) -->
+  <div id="tela-dashboard" class="hidden h-full flex flex-col overflow-hidden">
+
+  <header class="h-14 bg-slate-800 flex items-center justify-between px-6 shrink-0 shadow-md z-20 relative">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center text-white font-bold">GF</div>
+      <h1 class="text-white font-semibold text-lg tracking-tight uppercase">Gestão de Notas Fiscais</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 mr-4 cursor-pointer full-click-picker" onclick="const input = document.getElementById('txtReferencia'); if (input) { input.focus(); if (input.showPicker) { try { input.showPicker(); } catch(e) {} } }">
+        <label class="text-slate-400 text-xs font-medium uppercase cursor-pointer select-none">Mês/Ano:</label>
+        <input type="month" id="txtReferencia" class="bg-slate-700 text-white text-sm border border-slate-600 rounded px-3 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400 w-40 font-mono transition-all font-bold cursor-pointer" onchange="syncReferencia(this.value)" onclick="event.stopPropagation(); if (this.showPicker) { try { this.showPicker(); } catch(e) {} }">
+      </div>
+      <div class="flex items-center gap-2 bg-slate-700 border border-slate-600 px-3 py-1 rounded">
+        <label class="text-slate-400 text-xs font-medium uppercase">Operador:</label>
+        <span id="nome-operador" class="text-white font-bold font-sans"></span>
+      </div>
+      <button onclick="fazerLogout()" class="text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center p-1 rounded focus:outline-none" title="Sair do sistema">
+         <span class="material-symbols-outlined text-[18px]">logout</span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="flex items-end px-2 pt-2 bg-slate-200 border-b border-slate-300 shrink-0 gap-1 z-10 relative">
+    <button onclick="alterarAba('tab-notas')" id="btn-tab-notas" class="px-5 py-2.5 text-[13px] rounded-t border-l border-r transition-colors shadow-sm aba-ativa uppercase tracking-tight flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">table_view</span> Notas Fiscais
+    </button>
+    <button onclick="alterarAba('tab-lancar')" id="btn-tab-lancar" class="px-5 py-2.5 text-[13px] rounded-t border-l border-r transition-colors cursor-pointer aba-inativa uppercase tracking-tight flex items-center gap-2 text-emerald-700 font-bold hover:text-emerald-800">
+      <span class="material-symbols-outlined text-[18px] text-emerald-600">add_circle</span> Lançar Nova Nota
+    </button>
+    <button onclick="alterarAba('tab-empresas')" id="btn-tab-empresas" class="px-5 py-2.5 text-[13px] rounded-t border-l border-r transition-colors cursor-pointer aba-inativa uppercase tracking-tight flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">domain</span> Gerenciar Empresas
+    </button>
+    <button onclick="alterarAba('tab-condominios')" id="btn-tab-condominios" class="px-5 py-2.5 text-[13px] rounded-t border-l border-r transition-colors cursor-pointer aba-inativa uppercase tracking-tight flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">apartment</span> Gerenciar Condomínios
+    </button>
+    <div class="flex-1 w-full border-b-2 border-slate-300 self-stretch flex justify-end items-center pr-2">
+      <button onclick="alterarAba('tab-auditoria')" class="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors uppercase flex items-center gap-1">
+        <span class="material-symbols-outlined text-[14px]">history</span> Log Auditoria
+      </button>
+    </div>
+  </nav>
+
+  <main class="flex-1 overflow-hidden relative bg-white w-full h-full flex">
+
+    <!-- 1. ABA NOTAS FISCAIS -->
+    <section id="tab-notas" class="aba-conteudo flex-1 flex flex-col h-full overflow-hidden absolute inset-0 bg-white">
+      <div class="bg-slate-100 border-b border-slate-300 flex justify-between items-center px-4 py-2 shrink-0">
+        <div class="flex items-center gap-4">
+          <span class="text-xs font-bold text-slate-600 uppercase hidden lg:inline">Tabela de Controle</span>
+          <!-- Barra de Busca Dinâmica -->
+          <div class="flex items-center gap-2 bg-white border border-slate-300 px-2 py-1 rounded shadow-sm">
+             <span class="material-symbols-outlined text-slate-400 text-[18px]">search</span>
+             <input type="text" id="txtBuscaNotas" placeholder="Buscar fornecedor, NF, CNPJ, Cond..." class="text-xs bg-transparent focus:outline-none w-56 font-medium text-slate-800" oninput="renderNotas(false)">
+             <button onclick="document.getElementById('txtBuscaNotas').value = ''; renderNotas(false);" class="text-slate-400 hover:text-slate-600 focus:outline-none flex items-center justify-center cursor-pointer"><span class="material-symbols-outlined text-[14px]">close</span></button>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-[11px] font-bold text-slate-700 bg-white border border-slate-300 px-3 py-1 rounded shadow-sm">
+           <span class="uppercase text-slate-500 mr-1">Filtro de Encargos (>0):</span>
+           <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="fltISS" class="flt-encargo" onchange="renderNotas(false)"> ISS</label>
+           <label class="flex items-center gap-1 cursor-pointer text-blue-700"><input type="checkbox" class="flt-encargo" id="fltINSS" onchange="renderNotas(false)"> INSS</label>
+           <label class="flex items-center gap-1 cursor-pointer text-purple-700"><input type="checkbox" class="flt-encargo" id="fltIR" onchange="renderNotas(false)"> IR</label>
+           <label class="flex items-center gap-1 cursor-pointer text-orange-700"><input type="checkbox" class="flt-encargo" id="fltPIS" onchange="renderNotas(false)"> PIS/COFINS</label>
+        </div>
+        <div class="flex items-center gap-2">
+           <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors focus:ring-2 focus:ring-emerald-400 focus:outline-none">
+             <span class="material-symbols-outlined text-[16px]">download</span> Exportar Excel (.xls)
+           </button>
+           <button onclick="exportarPdf()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors focus:ring-2 focus:ring-red-400 focus:outline-none">
+             <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Imprimir PDF
+           </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto bg-slate-50">
+        <table class="w-full text-left text-[13px] whitespace-nowrap border-collapse" id="tableNotas">
+          <thead class="sticky top-0 z-10 shadow-sm select-none">
+            <tr>
+              <th class="p-2 w-16 text-center border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'codCond')">Cód. Cond. <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'nomeCond')">Nome do Condomínio <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'cnpj')">CNPJ <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'nomeEmp')">Nome Emissor <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-center border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'numNota')">Nº Nota <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-center border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'dataCompleta')">Data Emissão <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 text-emerald-800 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'valor')">Valor Total <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'iss')">ISS <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'inss')">INSS <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'ir')">IR <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 text-slate-800 bg-slate-200 relative group w-20">
+                 <div class="flex items-center justify-between cursor-pointer" onclick="sortGrid('notas', 'pisDigitado')"><span>PCC</span> <span class="text-[10px] opacity-70">↕</span></div>
+                 <button onclick="togglePccCols()" class="absolute -right-2 top-2 bg-slate-400 hover:bg-slate-500 text-white px-1 rounded text-[10px] hidden group-hover:block transition-all shadow z-20" title="Mostrar PIS/COFINS/CSLL detalhados">[+]</button>
+              </th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 text-[11px] text-slate-500 col-pcc-det hidden" onclick="sortGrid('notas', 'valPIS')">PIS</th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 text-[11px] text-slate-500 col-pcc-det hidden" onclick="sortGrid('notas', 'valCOFINS')">COFINS</th>
+              <th class="p-2 text-right border-b-2 border-b-slate-400 text-[11px] text-slate-500 col-pcc-det hidden" onclick="sortGrid('notas', 'valCSLL')">CSLL</th>
+              <th class="p-2 text-center border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300" onclick="sortGrid('notas', 'operador')">Operador <span class="text-[10px] opacity-70">↕</span></th>
+              <th class="p-2 text-center border-b-2 border-b-slate-400 w-16">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="gridNotas" class="divide-y divide-slate-200">
+             <!-- Renderizado dinamicamente -->
+          </tbody>
+        </table>
+      </div>
+      <footer class="h-7 bg-slate-200 border-t border-slate-300 flex items-center px-4 shrink-0 text-[10px] text-slate-600 font-medium">
+         <span class="mr-4">PRONTO</span> | <span class="mx-4 font-mono">MODO: VISUALIZAÇÃO</span> | <span class="ml-4 font-mono font-bold" id="qtdeNotas">TOTAL REGISTROS: 0</span>
+      </footer>
+    </section>
+
+    <!-- 2. ABA LANÇAR NOVA NOTA -->
+    <section id="tab-lancar" class="aba-conteudo hidden flex-1 flex-col h-full overflow-y-auto absolute inset-0 bg-slate-100 p-6">
+      <div class="max-w-5xl mx-auto w-full bg-white border border-slate-300 shadow-xl rounded flex flex-col mb-8">
+        <div class="bg-emerald-700 text-white px-6 py-4 flex items-center justify-between rounded-t shrink-0">
+          <div class="flex items-center gap-3">
+             <span class="material-symbols-outlined text-2xl">post_add</span>
+             <h2 class="text-base font-bold uppercase tracking-widest leading-none mb-1">Entrada de Nota Fiscal</h2>
+          </div>
+        </div>
+
+        <div class="p-8 flex flex-col gap-6" id="formLancarNota">
+          
+          <div class="col-span-12 bg-blue-50 border border-blue-200 p-3 rounded flex items-center justify-between mb-2 shadow-sm cursor-pointer full-click-picker" onclick="const input = document.getElementById('iptReferenciaInterna'); if (input) { input.focus(); if (input.showPicker) { try { input.showPicker(); } catch(e) {} } }">
+             <div class="flex items-center gap-3 select-none">
+               <span class="material-symbols-outlined text-blue-600 text-2xl">event_available</span>
+               <span class="text-[13px] text-blue-900 font-bold uppercase tracking-tight">Competência de Lançamento:</span>
+             </div>
+             <input type="month" id="iptReferenciaInterna" class="border border-blue-400 p-1.5 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-[14px] font-bold text-blue-900 bg-white cursor-pointer" onchange="syncReferencia(this.value)" onclick="event.stopPropagation(); if (this.showPicker) { try { this.showPicker(); } catch(e) {} }">
+          </div>
+
+          <!-- Linha 1 -->
+          <div class="grid grid-cols-12 gap-5 mt-2">
+            <div class="col-span-12 flex justify-center pb-2 mb-4 border-b border-slate-200">
+               <h2 id="lblHeaderCondominio" class="text-xl font-black text-slate-800 uppercase tracking-wide">AGUARDANDO CONDOMÍNIO...</h2>
+            </div>
+            <div class="col-span-12 md:col-span-3 flex flex-col gap-1.5 focus-within:text-emerald-700">
+              <label class="text-[11px] font-bold text-inherit uppercase">1. Cód. Condomínio</label>
+              <div class="flex items-center gap-2">
+                <input type="text" id="iptCondominio" maxlength="3" placeholder="XXX" class="border border-slate-300 p-2 text-[15px] w-full text-center rounded focus:outline-none focus:border-emerald-500 font-mono font-bold shadow-inner uppercase">
+              </div>
+            </div>
+            
+            <div class="col-span-12 md:col-span-4 flex flex-col gap-1.5 focus-within:text-emerald-700 relative">
+              <label class="text-[11px] font-bold text-inherit uppercase">2. CNPJ Emissor</label>
+              <input type="text" id="iptCnpj" maxlength="18" placeholder="00.000.000/0000-00" autocomplete="off" class="border border-slate-300 p-2 text-[14px] rounded focus:outline-none focus:border-emerald-500 font-mono shadow-inner text-slate-800 font-bold">
+              <ul id="listaCnpj" class="absolute top-[100%] left-0 w-full bg-white border border-slate-300 rounded shadow-lg max-h-48 overflow-y-auto hidden z-[60] mt-1 divide-y divide-slate-100"></ul>
+            </div>
+            
+            <div class="col-span-12 md:col-span-5 flex flex-col gap-1.5 relative">
+              <label id="lblRazaoSocial" class="text-[11px] font-bold text-slate-700 uppercase transition-colors">Razão Social</label>
+              <input type="text" id="iptRazaoSocial" placeholder="Digite para buscar..." class="border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors">
+              <ul id="listaNome" class="absolute top-[100%] left-0 w-full bg-white border border-slate-300 rounded shadow-lg max-h-48 overflow-y-auto hidden z-[60] mt-1 divide-y divide-slate-100"></ul>
+            </div>
+            
+            <div id="boxNovaEmpresa" class="col-span-12 bg-yellow-50 border border-yellow-400 p-3 rounded text-yellow-800 text-[13px] font-medium hidden mt-[-10px] items-center gap-2 shadow-sm">
+               <span class="material-symbols-outlined text-[18px]">info</span> 
+               <span><strong>CNPJ não cadastrado.</strong> Preencha a Razão Social acima. A empresa será salva automaticamente na base ao enviar a nota!</span>
+            </div>
+          </div>
+          
+          <!-- Linha 2 -->
+          <div class="grid grid-cols-12 gap-5 mt-2">
+            <div class="col-span-6 md:col-span-3 flex flex-col gap-1.5 focus-within:text-emerald-700">
+              <label class="text-[11px] font-bold text-inherit uppercase">3. Nº da Nota</label>
+              <input type="text" id="iptNota" placeholder="Apenas números..." class="border border-slate-300 p-2 text-[14px] rounded focus:outline-none focus:border-emerald-500 font-mono text-center shadow-inner">
+            </div>
+            
+            <div class="col-span-6 md:col-span-3 flex flex-col gap-1.5 focus-within:text-emerald-700">
+              <label class="text-[11px] font-bold text-inherit uppercase">4. Dia de Emissão</label>
+              <input type="number" id="iptDiaEmissao" min="1" max="31" placeholder="Venc. (1-31)" class="border border-slate-300 p-2 text-[14px] rounded focus:outline-none focus:border-emerald-500 font-mono text-center shadow-inner nav-field">
+            </div>
+            
+            <div class="col-span-12 md:col-span-6 flex items-end pb-1">
+               <!-- Moved down to footer -->
+            </div>
+          </div>
+          
+          <!-- Linha 3 (Valores) -->
+          <div class="grid grid-cols-12 gap-5 mt-2 pt-5 border-t border-slate-200">
+            <div class="col-span-12 md:col-span-3 flex flex-col gap-1.5">
+              <label class="text-[11px] font-black text-emerald-800 uppercase">5. Valor Bruto (R$)</label>
+              <input type="number" id="iptValorBruto" step="0.01" placeholder="0.00" class="border-2 border-emerald-400 p-2 rounded focus:outline-none focus:border-emerald-600 font-mono text-right text-[15px] font-black text-emerald-900 shadow-sm bg-white nav-field">
+            </div>
+            
+            <div class="col-span-12 md:col-span-2 flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-red-700 uppercase">6. ISS (R$)</label>
+              <input type="number" id="iptISS" step="0.01" placeholder="0.00" class="border border-slate-300 p-2 rounded focus:outline-none focus:border-red-500 font-mono text-right text-[13px] text-red-600 font-semibold shadow-inner bg-white nav-field">
+            </div>
+            
+            <div class="col-span-12 md:col-span-2 flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-slate-700 uppercase">7. INSS (R$)</label>
+              <input type="number" id="iptINSS" step="0.01" placeholder="0.00" class="border border-slate-300 p-2 rounded focus:outline-none focus:border-blue-500 font-mono text-right text-[13px] shadow-inner bg-white nav-field">
+            </div>
+            
+            <div class="col-span-12 md:col-span-2 flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-slate-700 uppercase">8. IR (R$)</label>
+              <input type="number" id="iptIR" step="0.01" placeholder="0.00" class="border border-slate-300 p-2 rounded focus:outline-none focus:border-blue-500 font-mono text-right text-[13px] shadow-inner bg-white nav-field">
+            </div>
+            
+            <div class="col-span-12 md:col-span-3 flex flex-col justify-center bg-slate-50 p-2 border border-slate-200 rounded gap-1.5 focus-within:ring-2 focus-within:ring-emerald-400">
+              <div class="flex items-center gap-1.5">
+                <input type="checkbox" id="chkPis" class="w-4 h-4 cursor-pointer nav-field" tabindex="0">
+                <label for="chkPis" class="text-[11px] font-bold text-slate-700 uppercase cursor-pointer">9. PCC (PIS/COF/CSLL)</label>
+              </div>
+              <div id="iptPisContainer" class="hidden flex-col gap-1 mt-1">
+                 <div class="flex gap-1" id="boxPccTotal">
+                   <input type="number" id="iptPisVal" step="0.01" title="Valor agrupado" class="border border-slate-300 rounded focus:outline-none focus:border-blue-500 w-full p-2 text-right text-[13px] font-mono bg-slate-100 shadow-inner text-slate-700" placeholder="0.00" readonly tabindex="-1">
+                   <button type="button" onclick="ativarEdicaoPccManual()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 rounded border border-indigo-300 flex items-center justify-center transition-colors shadow-sm focus:outline-none" title="Editar detalhadamente">
+                     <span class="material-symbols-outlined text-[14px]">edit</span>
+                   </button>
+                 </div>
+                 <div class="hidden gap-1 items-center" id="boxPccManual">
+                   <input type="number" id="iptPIS" step="0.01" title="PIS (0.65%)" placeholder="PIS" class="border border-slate-300 rounded focus:outline-none focus:border-blue-500 w-full p-1.5 text-right text-[11px] font-mono bg-white shadow-inner nav-field" oninput="atualizarSomaPcc()">
+                   <input type="number" id="iptCOFINS" step="0.01" title="COFINS (3.0%)" placeholder="COF" class="border border-slate-300 rounded focus:outline-none focus:border-blue-500 w-full p-1.5 text-right text-[11px] font-mono bg-white shadow-inner nav-field" oninput="atualizarSomaPcc()">
+                   <input type="number" id="iptCSLL" step="0.01" title="CSLL (1.0%)" placeholder="CSL" class="border border-slate-300 rounded focus:outline-none focus:border-blue-500 w-full p-1.5 text-right text-[11px] font-mono bg-white shadow-inner nav-field" oninput="atualizarSomaPcc()">
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-100 px-8 py-4 border-t border-slate-300 rounded-b flex flex-wrap items-center justify-between shrink-0 gap-4">
+           <button type="button" onclick="limparFormulario(true)" class="px-6 py-2 bg-white text-slate-700 text-[13px] font-bold uppercase rounded shadow-sm border border-slate-300 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500">
+             Limpar Tudo
+           </button>
+           
+           <!-- Display de Valor Líquido em Tempo Real -->
+           <div class="flex-1 max-w-[280px] bg-slate-800 text-slate-200 border border-slate-900 px-4 py-2 rounded flex items-center justify-between shadow-inner">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400">Valor Líquido:</span>
+              <span id="lblValorLiquido" class="font-mono text-sm font-black text-emerald-400 tracking-wide">R$ 0,00</span>
+           </div>
+           
+           <div class="flex items-center gap-4">
+               <div class="flex items-center gap-2 bg-blue-50 border border-blue-100 px-3 py-2 rounded focus-within:ring-2 focus-within:ring-emerald-400">
+                  <input type="checkbox" id="chkManterCNPJ" class="w-4 h-4 text-emerald-600 border-slate-400 rounded cursor-pointer nav-field" onchange="if(this.checked) document.getElementById('btnEnviarNota').focus()">
+                  <label for="chkManterCNPJ" class="text-[11px] text-blue-900 font-bold uppercase cursor-pointer select-none">Manter CNPJ/Nome</label>
+               </div>
+               <button type="button" id="btnEnviarNota" onclick="enviarNota()" onkeydown="if(event.key==='Enter') enviarNota()" class="px-8 py-2 bg-indigo-600 text-white text-[13px] font-bold uppercase rounded shadow border border-indigo-800 hover:bg-indigo-700 hover:scale-[1.02] transition-all nav-field focus:outline-none focus:ring-4 focus:ring-indigo-400 focus:ring-opacity-50 flex gap-2 items-center">
+                 <span class="material-symbols-outlined text-[18px]">send</span> Enviar Nota
+               </button>
+           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ABA EMPRESAS -->
+    <section id="tab-empresas" class="aba-conteudo hidden flex-1 h-full absolute inset-0 bg-slate-100 flex p-6 gap-6 justify-center">
+      <div class="flex-1 max-w-4xl bg-white border border-slate-300 shadow-sm rounded flex flex-col overflow-hidden">
+        <div class="bg-slate-800 text-white px-5 py-3 flex items-center justify-between shrink-0 border-b-2 border-slate-900">
+           <div class="flex items-center gap-2">
+             <span class="material-symbols-outlined">domain</span>
+             <h3 class="text-sm font-bold uppercase tracking-wider">Fornecedores Homologados</h3>
+           </div>
+           <div class="flex gap-2">
+             <button onclick="document.getElementById('modalNovaEmp').classList.remove('hidden')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors">
+                <span class="material-symbols-outlined text-[16px]">add</span> Nova
+             </button>
+             <button onclick="document.getElementById('modalLoteEmp').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors">
+                <span class="material-symbols-outlined text-[16px]">library_add</span> Lote (Excel)
+             </button>
+           </div>
+        </div>
+        <div class="flex-1 overflow-auto bg-slate-50">
+          <table class="w-full text-left text-[13px] whitespace-nowrap border-collapse">
+            <thead class="sticky top-0 bg-slate-200 shadow-sm z-10 select-none">
+              <tr>
+                <th class="p-3 w-44 font-bold border-r border-slate-300 cursor-pointer hover:bg-slate-300" onclick="sortGrid('empresas', 'cnpj')">CNPJ <span class="text-[10px] opacity-70">↕</span></th>
+                <th class="p-3 font-bold cursor-pointer hover:bg-slate-300" onclick="sortGrid('empresas', 'nome')">Razão Social <span class="text-[10px] opacity-70">↕</span></th>
+                <th class="p-3 w-16 text-center font-bold">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="gridEmpresas" class="divide-y divide-slate-200 bg-white">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. ABA CONDOMÍNIOS -->
+    <section id="tab-condominios" class="aba-conteudo hidden flex-1 h-full absolute inset-0 bg-slate-100 flex p-6 gap-6 justify-center">
+      <div class="flex-1 max-w-4xl bg-white border border-slate-300 shadow-sm rounded flex flex-col overflow-hidden">
+        <div class="bg-slate-800 text-white px-5 py-3 flex items-center justify-between shrink-0 border-b-2 border-slate-900">
+           <div class="flex items-center gap-2">
+             <span class="material-symbols-outlined">apartment</span>
+             <h3 class="text-sm font-bold uppercase tracking-wider">Portfólio de Condomínios</h3>
+           </div>
+           <div class="flex gap-2">
+             <button onclick="document.getElementById('modalNovoCond').classList.remove('hidden')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors">
+                <span class="material-symbols-outlined text-[16px]">add</span> Novo
+             </button>
+             <button onclick="document.getElementById('modalLoteCond').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors">
+                <span class="material-symbols-outlined text-[16px]">library_add</span> Lote (Excel)
+             </button>
+           </div>
+        </div>
+        <div class="flex-1 overflow-auto bg-slate-50">
+          <table class="w-full text-left text-[13px] whitespace-nowrap border-collapse">
+            <thead class="sticky top-0 bg-slate-200 shadow-sm z-10 select-none">
+              <tr>
+                <th class="p-3 w-24 text-center font-bold border-r border-slate-300 cursor-pointer hover:bg-slate-300" onclick="sortGrid('cond', 'codigo')">Cód. <span class="text-[10px] opacity-70">↕</span></th>
+                <th class="p-3 font-bold cursor-pointer hover:bg-slate-300" onclick="sortGrid('cond', 'nome')">Nome de Faturamento <span class="text-[10px] opacity-70">↕</span></th>
+                <th class="p-3 w-16 text-center font-bold">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="gridCondominios" class="divide-y divide-slate-200 bg-white">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. ABA AUDITORIA -->
+    <section id="tab-auditoria" class="aba-conteudo hidden flex-1 h-full absolute inset-0 bg-slate-50 flex flex-col overflow-hidden p-6 mx-auto w-full max-w-6xl z-50">
+      <div class="bg-white border text-slate-800 border-slate-300 rounded shadow-md flex flex-col overflow-hidden h-full">
+        <div class="bg-slate-800 text-white px-5 py-4 flex items-center gap-3 shrink-0 border-b-4 border-slate-900">
+          <span class="material-symbols-outlined text-xl">policy</span>
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-widest">Log de Auditoria</h3>
+            <p class="text-slate-300 text-[10px] font-mono mt-0.5">REGISTRO DE ATIVIDADES NO SISTEMA (MOCK)</p>
+          </div>
+        </div>
+
+        <!-- Filtros do Log de Auditoria -->
+        <div class="bg-slate-100 border-b border-slate-300 px-5 py-3 flex flex-wrap items-center justify-between gap-4 text-xs font-bold text-slate-700 shrink-0">
+          <div class="flex flex-wrap items-center gap-4">
+            <!-- Busca Dinâmica de Auditoria -->
+            <div class="flex flex-col gap-1 w-64 lg:w-72">
+              <label class="text-[10px] text-slate-500 uppercase tracking-tight">Buscar no Log</label>
+              <div class="flex items-center gap-2 bg-white border border-slate-300 px-2.5 py-1 rounded shadow-sm w-full">
+                 <span class="material-symbols-outlined text-slate-400 text-[18px]">search</span>
+                 <input type="text" id="txtBuscaAuditoria" placeholder="Buscar por NF, operador, descricao..." class="text-xs bg-transparent focus:outline-none w-full font-semibold text-slate-800" oninput="renderAuditoria()">
+                 <button onclick="document.getElementById('txtBuscaAuditoria').value = ''; renderAuditoria();" class="text-slate-400 hover:text-slate-600 focus:outline-none flex items-center justify-center cursor-pointer" title="Limpar busca"><span class="material-symbols-outlined text-[14px]">close</span></button>
+              </div>
+            </div>
+
+            <!-- Tipo de Registro -->
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] text-slate-500 uppercase tracking-tight">Atividade</label>
+              <select id="fltLogAcao" class="bg-white border border-slate-300 rounded px-2 py-1 w-56 font-bold text-slate-800 focus:outline-none" onchange="renderAuditoria()">
+                <option value="ALL">Todos os lançamentos e alterações</option>
+                <option value="CREATE_ONLY">Mostrar somente lançamentos de notas</option>
+                <option value="UPDATE_ONLY">Somente alterações</option>
+              </select>
+            </div>
+            
+            <!-- Tipo de Período -->
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] text-slate-500 uppercase tracking-tight">Período</label>
+              <select id="fltLogPeriodo" class="bg-white border border-slate-300 rounded px-2 py-1 w-28 font-bold text-slate-800 focus:outline-none" onchange="document.getElementById('fltLogCustomRange').style.display = (this.value === 'custom' ? 'flex' : 'none'); renderAuditoria();">
+                <option value="mensal">Mensal</option>
+                <option value="anual">Anual</option>
+                <option value="custom">Personalizado</option>
+              </select>
+            </div>
+
+            <!-- Custom Data Range Inputs -->
+            <div id="fltLogCustomRange" class="hidden items-center gap-2">
+              <div class="flex flex-col gap-1">
+                <label class="text-[10px] text-slate-500 uppercase tracking-tight">Data Início</label>
+                <input type="date" id="fltLogDataIni" class="bg-white border border-slate-300 rounded px-2 py-0.5 font-bold w-36 text-slate-800 focus:outline-none" onchange="renderAuditoria()">
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-[10px] text-slate-500 uppercase tracking-tight">Data Fim</label>
+                <input type="date" id="fltLogDataFim" class="bg-white border border-slate-300 rounded px-2 py-0.5 font-bold w-36 text-slate-800 focus:outline-none" onchange="renderAuditoria()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Direção da Ordenação -->
+          <div class="flex flex-col gap-1 items-end">
+            <label class="text-[10px] text-slate-500 uppercase tracking-tight font-black">Ordem de Exibição</label>
+            <select id="fltLogOrdem" class="bg-white border border-slate-300 rounded px-2 py-1 w-52 font-bold text-slate-800 focus:outline-none" onchange="renderAuditoria()">
+              <option value="desc">Mais recentes primeiro</option>
+              <option value="asc">Mais antigas primeiro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-auto bg-white">
+          <table class="w-full text-left text-[12px] whitespace-nowrap border-collapse border-slate-200">
+            <thead class="bg-slate-200 sticky top-0 shadow-sm z-10 select-none">
+              <tr>
+                <th class="p-2.5 w-36 font-bold border-r border-slate-300">Tempo / Date</th>
+                <th class="p-2.5 w-32 font-bold border-r border-slate-300 text-center">Operador</th>
+                <th class="p-2.5 w-42 font-bold border-r border-slate-300 text-center">Ação</th>
+                <th class="p-2.5 w-24 font-bold border-r border-slate-300 text-center">Nº Nota</th>
+                <th class="p-2.5 font-bold border-r border-slate-300">Condomínio</th>
+                <th class="p-2.5 font-bold border-r border-slate-300">CNPJ (Recurso)</th>
+                <th class="p-2.5 font-bold">Descrição Completa</th>
+              </tr>
+            </thead>
+            <tbody id="gridAuditoria" class="divide-y divide-slate-200 font-mono text-[11px] text-slate-700">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  </div> <!-- /tela-dashboard -->
+
+  <!-- TELA DE AUTENTICAÇÃO -->
+  <div id="tela-autenticacao" class="fixed inset-0 z-50 bg-slate-100 flex items-center justify-center backdrop-blur-sm px-4">
+     <div class="bg-white rounded-lg shadow-2xl border border-slate-300 w-full max-w-md overflow-hidden transform transition-all">
+        
+        <!-- Header da Tela de Auth -->
+        <div class="bg-slate-800 text-white px-6 py-5 flex flex-col items-center gap-2 border-b-4 border-slate-950">
+           <div class="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-extrabold text-lg shadow-md">GF</div>
+           <h2 class="text-base font-extrabold uppercase tracking-widest text-center">Gestão de Notas Fiscais</h2>
+        </div>
+
+        <!-- Box 1: Formulário de Login -->
+        <div id="box-login" class="p-6 flex flex-col gap-5">
+           <div class="text-center">
+              <h3 class="text-slate-800 text-sm font-black uppercase tracking-wider">Acesso Restrito - Controle de Encargos</h3>
+           </div>
+           
+           <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-600 uppercase">E-mail corporativo</label>
+              <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                 <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">mail</span>
+                 <input type="email" id="txtEmail" placeholder="email@empresa.com" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+              </div>
+           </div>
+
+           <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-600 uppercase">Senha</label>
+              <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                 <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">lock</span>
+                 <input type="password" id="txtSenha" placeholder="••••••••" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+               </div>
+            </div>
+
+            <!-- Lembrar meu e-mail checkbox -->
+            <div class="flex items-center gap-2 mt-1">
+               <input type="checkbox" id="chkLembrarEmail" class="w-4 h-4 text-emerald-650 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer">
+               <label for="chkLembrarEmail" class="text-xs text-slate-600 font-semibold cursor-pointer select-none">Lembrar meu e-mail</label>
+            </div>
+
+            <div class="flex flex-col gap-1.5 hidden">
+               <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                  <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">lock</span>
+                  <input type="password" id="txtSenhaDummy" placeholder="••••••••" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+              </div>
+           </div>
+
+           <button onclick="executarLogin()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase py-3 rounded-md shadow-md border border-emerald-800 transition-all hover:scale-[1.01] active:scale-[0.99] flex justify-center items-center gap-1.5 cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">key</span> Entrar
+           </button>
+
+           <div class="text-center border-t border-slate-200 pt-4 mt-1 border-dotted">
+              <button onclick="mostrarTelaPrimeiroAcesso()" class="text-emerald-700 hover:text-emerald-950 text-xs font-bold uppercase transition-colors cursor-pointer">Primeiro Acesso / Cadastrar</button>
+           </div>
+        </div>
+
+        <!-- Box 2: Formulário de Primeiro Acesso (Cadastro) -->
+        <div id="box-cadastro" class="p-6 flex flex-col gap-5 hidden">
+           <div class="text-center">
+              <h3 class="text-slate-800 text-sm font-black uppercase tracking-wider">Definir Cadastro</h3>
+              <p class="text-slate-550 text-[11px] mt-1 text-slate-500">Insira seus dados para ativar sua conta no sistema.</p>
+           </div>
+
+           <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-600 uppercase">Seu Nome Completo</label>
+              <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                 <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">person</span>
+                 <input type="text" id="txtNomeUsuario" placeholder="Ex: Roberto Carlos" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+              </div>
+           </div>
+
+           <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-600 uppercase">E-mail corporativo</label>
+              <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                 <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">mail</span>
+                 <input type="email" id="txtEmailCadastro" placeholder="roberto@empresa.com" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+              </div>
+           </div>
+
+           <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-600 uppercase">Nova Senha</label>
+              <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                 <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">lock</span>
+                 <input type="password" id="txtNovaSenha" placeholder="Senha Forte" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+              </div>
+           </div>
+
+           <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-600 uppercase">Confirmar Senha</label>
+              <div class="flex items-center border border-slate-300 rounded focus-within:border-emerald-500 bg-slate-50">
+                 <span class="material-symbols-outlined text-slate-400 pl-3 text-[18px]">lock</span>
+                 <input type="password" id="txtConfirmarSenha" placeholder="Repita a Senha" class="p-2.5 w-full bg-transparent text-sm focus:outline-none font-medium text-slate-800">
+              </div>
+           </div>
+
+           <button onclick="executarCadastro()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase py-3 rounded-md shadow-md border border-indigo-800 transition-all hover:scale-[1.01] active:scale-[0.99] flex justify-center items-center gap-1.5 cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">save</span> Salvar e Acessar
+           </button>
+
+           <div class="text-center border-t border-slate-200 pt-4 mt-1 border-dotted">
+              <button onclick="mostrarTelaLogin()" class="text-slate-650 hover:text-slate-850 text-xs font-bold uppercase transition-colors cursor-pointer">Voltar para o Login</button>
+           </div>
+        </div>
+
+     </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-[99] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Modais -->
+  <!-- Modal Nova Empresa -->
+  <div id="modalNovaEmp" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] hidden">
+     <div class="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+        <div class="bg-emerald-700 px-4 py-3 flex items-center justify-between">
+           <h3 class="text-white font-bold uppercase text-sm">Nova Empresa</h3>
+           <button onclick="document.getElementById('modalNovaEmp').classList.add('hidden')" class="text-emerald-100 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="p-4 flex flex-col gap-4">
+           <div class="flex flex-col gap-1.5">
+             <label class="text-[11px] font-bold text-slate-700 uppercase">CNPJ</label>
+             <input type="text" id="novaCnpjEmp" placeholder="00.000.000/0000-00" class="border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-emerald-500 font-mono text-center">
+           </div>
+           <div class="flex flex-col gap-1.5">
+             <label class="text-[11px] font-bold text-slate-700 uppercase">Razão Social</label>
+             <input type="text" id="novoNomeEmp" placeholder="Empresa XPTO" class="border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-emerald-500 font-bold">
+           </div>
+        </div>
+        <div class="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+           <button onclick="document.getElementById('modalNovaEmp').classList.add('hidden')" class="px-4 py-2 text-xs font-bold text-slate-600 uppercase hover:bg-slate-200 rounded">Cancelar</button>
+           <button onclick="salvarNovaEmpresa()" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white uppercase hover:bg-emerald-700 rounded shadow-sm">Salvar</button>
+        </div>
+     </div>
+  </div>
+
+  <!-- Modal Cadastro em Lote Empresas -->
+  <div id="modalLoteEmp" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] hidden">
+     <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
+        <div class="bg-blue-700 px-4 py-3 flex items-center justify-between">
+           <h3 class="text-white font-bold uppercase text-sm">Cadastro em Lote de Empresas (Copiar/Colar Excel)</h3>
+           <button onclick="document.getElementById('modalLoteEmp').classList.add('hidden')" class="text-blue-100 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="p-4 flex flex-col gap-3">
+           <p class="text-xs text-slate-600">Cole abaixo as duas colunas do Excel: <strong>CNPJ</strong> e <strong>RAZÃO SOCIAL</strong>.</p>
+           <textarea id="txtLoteEmp" class="w-full h-48 border border-slate-300 rounded p-3 text-sm focus:outline-none focus:border-blue-500 font-mono text-slate-700 leading-relaxed" placeholder="00.000.000/0000-00	Empresa A..."></textarea>
+        </div>
+        <div class="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+           <button onclick="document.getElementById('modalLoteEmp').classList.add('hidden')" class="px-4 py-2 text-xs font-bold text-slate-600 uppercase hover:bg-slate-200 rounded">Cancelar</button>
+           <button onclick="processarLoteEmpresa()" class="px-4 py-2 text-xs font-bold bg-blue-600 text-white uppercase hover:bg-blue-700 rounded shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">play_arrow</span> Processar</button>
+        </div>
+     </div>
+  </div>
+
+  <!-- Modal Novo Condomínio -->
+  <div id="modalNovoCond" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] hidden">
+     <div class="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+        <div class="bg-emerald-700 px-4 py-3 flex items-center justify-between">
+           <h3 class="text-white font-bold uppercase text-sm">Novo Condomínio</h3>
+           <button onclick="document.getElementById('modalNovoCond').classList.add('hidden')" class="text-emerald-100 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="p-4 flex flex-col gap-4">
+           <div class="flex flex-col gap-1.5">
+             <label class="text-[11px] font-bold text-slate-700 uppercase">Cód. Condomínio</label>
+             <input type="text" id="novaCodCond" maxlength="3" placeholder="001" class="border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-emerald-500 font-mono text-center uppercase">
+           </div>
+           <div class="flex flex-col gap-1.5">
+             <label class="text-[11px] font-bold text-slate-700 uppercase">Nome de Faturamento</label>
+             <input type="text" id="novoNomeCond" placeholder="Cond. XPTO" class="border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-emerald-500 font-bold">
+           </div>
+        </div>
+        <div class="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+           <button onclick="document.getElementById('modalNovoCond').classList.add('hidden')" class="px-4 py-2 text-xs font-bold text-slate-600 uppercase hover:bg-slate-200 rounded">Cancelar</button>
+           <button onclick="salvarNovoCondominio()" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white uppercase hover:bg-emerald-700 rounded shadow-sm">Salvar</button>
+        </div>
+     </div>
+  </div>
+
+  <!-- Modal Cadastro em Lote Condomínio -->
+  <div id="modalLoteCond" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] hidden">
+     <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
+        <div class="bg-blue-700 px-4 py-3 flex items-center justify-between">
+           <h3 class="text-white font-bold uppercase text-sm">Cadastro em Lote (Copiar e Colar)</h3>
+           <button onclick="document.getElementById('modalLoteCond').classList.add('hidden')" class="text-blue-100 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="p-4 flex flex-col gap-3">
+           <p class="text-xs text-slate-600">Cole abaixo as duas colunas do Excel: <strong>CÓDIGO (3 dígitos)</strong> e <strong>NOME DO CONDOMÍNIO</strong>.</p>
+           <textarea id="txtLoteCond" class="w-full h-48 border border-slate-300 rounded p-3 text-sm focus:outline-none focus:border-blue-500 font-mono text-slate-700 leading-relaxed" placeholder="001	Condomínio A
+002	Condomínio B..."></textarea>
+        </div>
+        <div class="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+           <button onclick="document.getElementById('modalLoteCond').classList.add('hidden')" class="px-4 py-2 text-xs font-bold text-slate-600 uppercase hover:bg-slate-200 rounded">Cancelar</button>
+           <button onclick="processarLoteCondominio()" class="px-4 py-2 text-xs font-bold bg-blue-600 text-white uppercase hover:bg-blue-700 rounded shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">play_arrow</span> Processar</button>
+        </div>
+     </div>
+  </div>
+
+  <script>
+    // --- 0. TOAST NOTIFICATION SYSTEM ---
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let bgColor = 'bg-blue-600', icon = 'info';
+      if (type === 'success') { bgColor = 'bg-emerald-600'; icon = 'check_circle'; }
+      if (type === 'error') { bgColor = 'bg-red-600'; icon = 'error_outline'; }
+      if (type === 'warning') { bgColor = 'bg-yellow-500 text-slate-900'; icon = 'warning'; }
+
+      toast.className = `${bgColor} ${type === 'warning' ? 'text-slate-900' : 'text-white'} px-4 py-3 rounded shadow-lg flex items-center gap-3 text-[13px] font-bold opacity-0 transition-opacity duration-300 transform translate-y-2 pointer-events-auto`;
+      toast.innerHTML = `<span class="material-symbols-outlined">${icon}</span> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      
+      requestAnimationFrame(() => {
+        toast.classList.remove('opacity-0', 'translate-y-2');
+        toast.classList.add('opacity-100', 'translate-y-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // --- SORTS & DATA STATES ---
+    let sortState = {
+       notas: { col: '', asc: true },
+       empresas: { col: '', asc: true },
+       cond: { col: '', asc: true }
+    };
+
+    function sortGrid(gridName, col) {
+       let st = sortState[gridName];
+       if (st.col === col) {
+          st.asc = !st.asc;
+       } else {
+          st.col = col;
+          st.asc = true;
+       }
+       if (gridName === 'notas') renderNotas();
+       if (gridName === 'empresas') renderEmpresas();
+       if (gridName === 'cond') renderCondominios();
+    }
+
+    function parseMoney(str) {
+        return parseFloat(String(str).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+    }
+
+    function exportarExcel() {
+        let table = document.getElementById("tableNotas").cloneNode(true);
+        Array.from(table.rows).forEach(r => r.deleteCell(-1)); // remove ações
+
+        // Clean up table/thead headings so PCC and other headers occupy exactly 1 row
+        let thead = table.querySelector('thead');
+        if (thead) {
+            let cells = thead.querySelectorAll('th');
+            cells.forEach((cell, idx) => {
+                let text = "";
+                if (idx === 0) text = "Cód. Cond.";
+                else if (idx === 1) text = "Nome do Condomínio";
+                else if (idx === 2) text = "CNPJ";
+                else if (idx === 3) text = "Nome Emissor";
+                else if (idx === 4) text = "Nº Nota";
+                else if (idx === 5) text = "Data Emissão";
+                else if (idx === 6) text = "Valor Total";
+                else if (idx === 7) text = "ISS";
+                else if (idx === 8) text = "INSS";
+                else if (idx === 9) text = "IR";
+                else if (cell.classList.contains('col-pcc-det') && cell.innerHTML.includes('PIS')) text = "PIS";
+                else if (cell.classList.contains('col-pcc-det') && cell.innerHTML.includes('COFINS')) text = "COFINS";
+                else if (cell.classList.contains('col-pcc-det') && cell.innerHTML.includes('CSLL')) text = "CSLL";
+                else if (idx === 10 || cell.textContent.includes('PCC')) text = "PCC";
+                else text = cell.textContent.replace(/↕/g, "").replace(/\[\+\]/g, "").trim();
+                
+                cell.innerHTML = `<strong>${text}</strong>`;
+            });
+        }
+
+        // Clean up data cells for proper Excel formatting and numeric sorting
+        const numericProps = ["valor", "iss", "inss", "ir", "pisDigitado", "valPIS", "valCOFINS", "valCSLL"];
+        Array.from(table.querySelectorAll('tbody tr')).forEach(tr => {
+            Array.from(tr.cells).forEach(cell => {
+                let prop = cell.getAttribute('data-prop');
+                if (numericProps.includes(prop)) {
+                    let numVal = parseMoney(cell.textContent || cell.innerText);
+                    // Force Excel to treat the cell numerically using the x:num attribute in the standard float format
+                    cell.setAttribute('x:num', numVal.toFixed(2));
+                    // Apply native Excel style for beautiful currency rendering and right alignment
+                    cell.setAttribute('style', "mso-number-format:'\"R$\"\\ #\\,##0\\.00'; text-align: right;");
+                } else if (prop === "codCond" || prop === "cnpj" || prop === "numNota") {
+                    // Instruct Excel to treat codes, CNPJs, and invoices as strings so zero prefixes are preserved
+                    cell.setAttribute('style', "mso-number-format:'\\@';");
+                }
+            });
+        });
+
+        let html = `
+        <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head>
+          <meta charset="utf-8">
+        </head>
+        <body>
+          <table border="1">${table.innerHTML}</table>
+        </body>
+        </html>`;
+
+        let blob = new Blob([html], {type: 'application/vnd.ms-excel'});
+        let url = URL.createObjectURL(blob);
+        let link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `notas-fiscais-${document.getElementById('txtReferencia').value}.xls`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportarPdf() {
+        try {
+            let win = window.open('', '_blank');
+            if (win) {
+                let tableClone = document.getElementById('tableNotas').cloneNode(true);
+                Array.from(tableClone.rows).forEach(r => r.deleteCell(-1));
+                win.document.write(`
+                    <html>
+                    <head>
+                        <title>Notas Fiscais</title>
+                        <style>
+                            body { font-family: sans-serif; }
+                            table { border-collapse: collapse; width: 100%; font-size: 11px; }
+                            th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+                            th { background-color: #eee; }
+                            .text-right { text-align: right; }
+                            .text-center { text-align: center; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>Relatório de Notas</h2>
+                        ${tableClone.outerHTML}
+                    </body>
+                    </html>
+                `);
+                win.document.close();
+                win.focus();
+                win.print();
+                win.close();
+            } else {
+                showToast("Para imprimir, abra o aplicativo em uma nova guia pelo botão superior do AI Studio.", "warning");
+            }
+        } catch (e) {
+            window.print();
+        }
+    }
+
+    // --- 1. SUPABASE CLIENT INITIALIZATION & DATA DEFINITIONS ---
+    const SUPABASE_URL = 'https://iryhhkggymluqldjfghq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWhoa2dneW1sdXFsZGpmZ2hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNTk1NzIsImV4cCI6MjA5NjkzNTU3Mn0.dBUhRpTxW4Vqh1SIBlYCL78IKsMnkf4F2Bw06aYVkJc';
+    
+    var supabase = (function() {
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+            try {
+                return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: window.sessionStorage, autoRefreshToken: true, persistSession: true } });
+            } catch(e) {
+                console.error("Erro ao inicializar o Supabase:", e);
+            }
+        }
+        return null;
+    })();
+
+    let dbCondominios = [];
+    let dbEmpresas = [];
+    let dbNotas = [];
+    let dbAuditoria = [];
+
+    async function sincronizarDados(entidade = 'todas') {
+        if (!supabase) return;
+        try {
+            if (entidade === 'todas' || entidade === 'condominios') {
+                const { data } = await supabase.from('condominios').select('*').order('codigo');
+                if (data) {
+                    dbCondominios = data.map(c => ({
+                        codigo: c.codigo,
+                        nome: c.razao_social
+                    }));
+                }
+            }
+            if (entidade === 'todas' || entidade === 'empresas') {
+                const { data } = await supabase.from('empresas').select('*').order('razao_social');
+                if (data) {
+                    dbEmpresas = data.map(e => ({
+                        cnpj: e.cnpj,
+                        nome: e.razao_social
+                    }));
+                }
+            }
+            if (entidade === 'todas' || entidade === 'notas') {
+                const { data } = await supabase.from('notas_fiscais').select(`
+                    id,
+                    condominio_codigo,
+                    empresa_cnpj,
+                    numero_nota,
+                    data_consolidada,
+                    referencia,
+                    valor_bruto,
+                    iss,
+                    inss,
+                    ir,
+                    is_pcc,
+                    pis_digitado,
+                    val_pis,
+                    val_cofins,
+                    val_csll,
+                    criado_por,
+                    created_at,
+                    condominios(razao_social),
+                    empresas(razao_social)
+                `).order('created_at', { ascending: false });
+
+                if (data) {
+                    dbNotas = data.map(n => ({
+                        id: n.id,
+                        codCond: n.condominio_codigo,
+                        nomeCond: n.condominios ? n.condominios.razao_social : 'CONDOMÍNIO DESCONHECIDO',
+                        cnpj: n.empresa_cnpj,
+                        nomeEmp: n.empresas ? n.empresas.razao_social : 'EMPRESA DESCONHECIDA',
+                        numNota: n.numero_nota,
+                        dataCompleta: n.data_consolidada,
+                        referencia: n.referencia,
+                        valor: Number(n.valor_bruto),
+                        iss: Number(n.iss),
+                        inss: Number(n.inss),
+                        ir: Number(n.ir),
+                        pisDigitado: Number(n.pis_digitado),
+                        valPIS: Number(n.val_pis),
+                        valCOFINS: Number(n.val_cofins),
+                        valCSLL: Number(n.val_csll),
+                        operador: n.criado_por,
+                        dataHora: n.created_at ? formatDateTime(new Date(n.created_at)) : ''
+                    }));
+                }
+            }
+            if (entidade === 'todas' || entidade === 'auditoria') {
+                const { data } = await supabase.from('logs_auditoria').select('*').order('created_at', { ascending: false });
+                if (data) {
+                    dbAuditoria = data.map(l => ({
+                        id: l.id,
+                        dataHora: l.created_at ? formatDateTime(new Date(l.created_at)) : '',
+                        operador: l.operador,
+                        acao: l.acao,
+                        entidade: l.entidade,
+                        recurso: l.recurso,
+                        descricao: l.descricao,
+                        referencia: l.referencia
+                    }));
+                }
+            }
+        } catch (e) {
+            console.error("Erro na sincronização de dados:", e);
+        }
+    }
+
+    // --- 2. UTLITY FUNCTIONS ---
+    function formatMoney(num) {
+      return Number(num).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function formatDateTime(d) {
+      if(!d) return '';
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function mascararCNPJ(v) {
+      v = v.replace(/\D/g, "");                           
+      v = v.replace(/^(\d{2})(\d)/, "$1.$2");             
+      v = v.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3"); 
+      v = v.replace(/\.(\d{3})(\d)/, ".$1/$2");           
+      v = v.replace(/(\d{4})(\d)/, "$1-$2");              
+      return v;
+    }
+
+    function titleCase(str) {
+        if (!str) return '';
+        return str.toLowerCase().split(/\s+/).map(w => {
+            if (['da','de','do','das','dos','e'].includes(w)) return w;
+            return w.charAt(0).toUpperCase() + w.slice(1);
+        }).join(' ');
+    }
+
+    function validarCNPJ(cnpjStr) {
+      let cnpj = cnpjStr.replace(/[^\d]+/g, '');
+      if (cnpj === '') return false;
+      if (cnpj.length !== 14) return false;
+      if (/^(\d)\1+$/.test(cnpj)) return false; // Bloqueia repetidos como 00000000000000
+      
+      let tamanho = cnpj.length - 2;
+      let numeros = cnpj.substring(0, tamanho);
+      let digitos = cnpj.substring(tamanho);
+      let soma = 0, pos = tamanho - 7;
+      for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+      }
+      let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+      if (resultado != digitos.charAt(0)) return false;
+      
+      tamanho = tamanho + 1;
+      numeros = cnpj.substring(0, tamanho);
+      soma = 0; pos = tamanho - 7;
+      for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+      }
+      resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+      if (resultado != digitos.charAt(1)) return false;
+      
+      return true;
+    }
+
+    function getOperador() {
+      const el = document.getElementById('nome-operador');
+      return (el ? el.innerText : 'Desconhecido').toUpperCase();
+    }
+
+    function recalcularValorLiquido() {
+       const brutoEl = document.getElementById('iptValorBruto');
+       const issEl = document.getElementById('iptISS');
+       const inssEl = document.getElementById('iptINSS');
+       const irEl = document.getElementById('iptIR');
+       const chkPisEl = document.getElementById('chkPis');
+       const pisValEl = document.getElementById('iptPisVal');
+       const lblValorLiquido = document.getElementById('lblValorLiquido');
+       
+       if (!lblValorLiquido) return;
+       
+       let bruto = parseFloat(brutoEl ? brutoEl.value : 0) || 0;
+       let iss = parseFloat(issEl ? issEl.value : 0) || 0;
+       let inss = parseFloat(inssEl ? inssEl.value : 0) || 0;
+       let ir = parseFloat(irEl ? irEl.value : 0) || 0;
+       let pcc = (chkPisEl && chkPisEl.checked) ? (parseFloat(pisValEl ? pisValEl.value : 0) || 0) : 0;
+       
+       let liquido = bruto - (iss + inss + ir + pcc);
+       lblValorLiquido.innerText = formatMoney(liquido);
+    }
+
+    // --- 3. DOM ELEMENTS ---
+    const iptCondominio = document.getElementById('iptCondominio');
+    const iptCnpj = document.getElementById('iptCnpj');
+    const iptRazaoSocial = document.getElementById('iptRazaoSocial');
+    const lblRazaoSocial = document.getElementById('lblRazaoSocial');
+    const iptNota = document.getElementById('iptNota');
+    const iptDiaEmissao = document.getElementById('iptDiaEmissao');
+    const chkManterCNPJ = document.getElementById('chkManterCNPJ');
+    
+    // Valores
+    const iptValorBruto = document.getElementById('iptValorBruto');
+    const iptISS = document.getElementById('iptISS');
+    const iptINSS = document.getElementById('iptINSS');
+    const iptIR = document.getElementById('iptIR');
+    const chkPis = document.getElementById('chkPis');
+    const iptPisContainer = document.getElementById('iptPisContainer');
+    const iptPisVal = document.getElementById('iptPisVal');
+    const iptPIS = document.getElementById('iptPIS');
+    const iptCOFINS = document.getElementById('iptCOFINS');
+    const iptCSLL = document.getElementById('iptCSLL');
+
+    // --- 4. BEHAVIORS & VALIDATIONS (Event Listeners) ---
+
+    let iptDiaEmissaoWarned = false;
+    iptDiaEmissao.addEventListener('input', function() {
+        if (this.value.length > 2) {
+            this.value = this.value.slice(0, 2);
+        }
+        this.classList.remove('border-red-500', 'text-red-700', 'bg-red-50', 'ring-2', 'ring-red-400');
+        this.classList.add('border-slate-300', 'focus:border-emerald-500');
+        iptDiaEmissaoWarned = false;
+    });
+
+    iptDiaEmissao.addEventListener('blur', function() {
+        let val = parseInt(this.value);
+        if (this.value !== '' && (isNaN(val) || val > 31 || val <= 0)) {
+            this.classList.add('border-red-500', 'text-red-700', 'bg-red-50', 'ring-2', 'ring-red-400');
+            this.classList.remove('border-slate-300', 'focus:border-emerald-500');
+            if (!iptDiaEmissaoWarned) {
+                showToast('Atenção: O dia deve ser um número válido (01 a 31).', 'error');
+                iptDiaEmissaoWarned = true;
+            }
+        }
+    });
+
+    iptISS.addEventListener('blur', function() {
+       let valBruto = parseFloat(iptValorBruto.value) || 0;
+       let issCalc = parseFloat(this.value) || 0;
+       if (valBruto > 0 && issCalc > (valBruto * 0.10)) {
+           showToast('ISS inválido: não pode ser maior que 10% do total.', 'error');
+           this.classList.add('border-red-500', 'text-red-700', 'bg-red-50', 'ring-2', 'ring-red-400');
+       } else {
+           this.classList.remove('border-red-500', 'text-red-700', 'bg-red-50', 'ring-2', 'ring-red-400');
+       }
+    });
+
+    iptNota.addEventListener('blur', function() {
+       this.value = this.value.replace(/^0+/, ''); // Remove zeros a esquerda
+       let numNota = this.value.trim();
+       let cnpj = iptCnpj.value;
+       let refSelecionada = document.getElementById('txtReferencia').value;
+
+       if (numNota && cnpj && refSelecionada) {
+           let isDupe = dbNotas.some(n => n.cnpj === cnpj && n.numNota === numNota && n.referencia === refSelecionada);
+           if (isDupe) {
+               showToast(`ATENÇÃO: Nota fiscal nº ${numNota} já consta no sistema para este CNPJ no período ${refSelecionada}!`, 'error');
+               const form = document.getElementById('formLancarNota');
+               form.classList.add('ring-4', 'ring-red-500', 'transition-all', 'duration-200');
+               
+               try {
+                   let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                   let osc = audioCtx.createOscillator();
+                   let gain = audioCtx.createGain();
+                   osc.connect(gain);
+                   gain.connect(audioCtx.destination);
+                   osc.type = 'square';
+                   osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                   osc.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
+                   gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                   osc.start();
+                   osc.stop(audioCtx.currentTime + 0.3);
+               } catch(e) {}
+               
+               setTimeout(() => {
+                   form.classList.remove('ring-4', 'ring-red-500');
+                   limparFormulario(true);
+               }, 2000);
+           }
+       }
+    });
+
+    // Enter Navigation
+    document.addEventListener('DOMContentLoaded', () => {
+       const navs = Array.from(document.querySelectorAll('.nav-field, #iptCondominio, #iptCnpj, #iptNota'));
+       navs.forEach((fld, idx) => {
+           fld.addEventListener('keydown', function(evt) {
+               if (evt.key === 'Enter') {
+                   evt.preventDefault();
+                   let next = navs[idx + 1];
+                   if (next) {
+                       next.focus();
+                       if (next.tagName === 'INPUT' && next.type !== 'checkbox') next.select();
+                   }
+               }
+           });
+       });
+    });
+
+    iptCondominio.addEventListener('input', function() {
+       let val = this.value.toUpperCase();
+       this.value = val;
+       const lblCondHeader = document.getElementById('lblHeaderCondominio');
+       if (val.length < 3) {
+          lblCondHeader.innerText = 'AGUARDANDO CONDOMÍNIO...';
+          lblCondHeader.className = 'text-xl font-black text-slate-800 uppercase tracking-wide';
+       }
+    });
+
+    iptCondominio.addEventListener('blur', async function() {
+       let val = this.value.trim().toUpperCase();
+       if (!val) return;
+       if (val.length !== 3) {
+           showToast('Código do condomínio deve conter 3 dígitos.', 'error');
+           this.value = '';
+           return;
+       }
+       const lblCondHeader = document.getElementById('lblHeaderCondominio');
+       lblCondHeader.innerText = 'BUSCANDO NO BANCO...';
+       
+       try {
+           const { data, error } = await supabase.from('condominios').select('razao_social').eq('codigo', val).maybeSingle();
+           if (data) {
+               lblCondHeader.innerText = data.razao_social;
+               lblCondHeader.className = 'text-xl font-black text-emerald-700 uppercase tracking-wide';
+               setTimeout(() => iptCnpj.focus(), 10);
+           } else {
+               showToast('Código do condomínio não encontrado.', 'error');
+               this.value = '';
+               lblCondHeader.innerText = 'CÓDIGO INEXISTENTE';
+               lblCondHeader.className = 'text-xl font-black text-red-600 uppercase tracking-wide';
+               setTimeout(() => this.focus(), 10);
+           }
+       } catch (e) {
+           console.error(e);
+           lblCondHeader.innerText = 'ERRO DE CONEXÃO';
+       }
+    });
+
+    // b) CNPJ Autocomplete e Validação
+    const listaCnpj = document.getElementById('listaCnpj');
+    const listaNome = document.getElementById('listaNome');
+
+    iptCnpj.addEventListener('input', async function() {
+       let valFormatado = mascararCNPJ(this.value);
+       this.value = valFormatado;
+       
+       let raw = valFormatado.replace(/[^\d]+/g, '');
+       if (raw.length > 0) {
+           let filtrados = ((await supabase.from('empresas').select('*').ilike('cnpj', '%' + raw + '%')).data || []).map(e => ({ cnpj: e.cnpj, nome: e.razao_social }));
+           renderAutocompleteCnpj(filtrados);
+       } else {
+           listaCnpj.classList.add('hidden');
+           iptRazaoSocial.value = "";
+           iptRazaoSocial.readOnly = false;
+           iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors';
+           lblRazaoSocial.innerText = "Razão Social";
+           lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+           document.getElementById('boxNovaEmpresa').classList.add('hidden');
+           document.getElementById('boxNovaEmpresa').classList.remove('flex');
+       }
+    });
+
+    iptRazaoSocial.addEventListener('input', async function() {
+       if (iptCnpj.value.length > 0) return; // Só busca se CNPJ tiver vazio
+       let val = this.value.toLowerCase();
+       if (val.length > 1) {
+           let filtrados = ((await supabase.from('empresas').select('*').ilike('razao_social', '%' + val + '%')).data || []).map(e => ({ cnpj: e.cnpj, nome: e.razao_social }));
+           renderAutocompleteNome(filtrados);
+       } else {
+           listaNome.classList.add('hidden');
+       }
+    });
+
+    [
+        { ipt: iptCnpj, list: listaCnpj },
+        { ipt: iptRazaoSocial, list: listaNome }
+    ].forEach(obj => {
+        obj.ipt.addEventListener('keydown', function(e) {
+            if (obj.list.classList.contains('hidden') || obj.list.children.length === 0) return;
+            
+            let activeEl = obj.list.querySelector('.autocomplete-active');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!activeEl) {
+                    obj.list.children[0].classList.add('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                } else {
+                    activeEl.classList.remove('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                    if (activeEl.nextElementSibling) {
+                        activeEl.nextElementSibling.classList.add('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                    } else {
+                        obj.list.children[0].classList.add('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                    }
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!activeEl) {
+                    obj.list.lastElementChild.classList.add('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                } else {
+                    activeEl.classList.remove('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                    if (activeEl.previousElementSibling) {
+                        activeEl.previousElementSibling.classList.add('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                    } else {
+                        obj.list.lastElementChild.classList.add('bg-emerald-100', 'text-emerald-900', 'autocomplete-active');
+                    }
+                }
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (activeEl) {
+                    e.preventDefault();
+                    activeEl.dispatchEvent(new MouseEvent('mousedown'));
+                } else {
+                    e.preventDefault();
+                    obj.list.children[0].dispatchEvent(new MouseEvent('mousedown'));
+                }
+            } else if (e.key === 'Escape') {
+                obj.list.classList.add('hidden');
+            }
+        });
+    });
+
+    function renderAutocompleteCnpj(empresas) {
+       if (empresas.length === 0) {
+          listaCnpj.classList.add('hidden');
+          return;
+       }
+       listaCnpj.innerHTML = '';
+       empresas.forEach(e => {
+          let li = document.createElement('li');
+          li.className = 'p-2 text-[13.5px] font-mono cursor-pointer hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 font-medium transition-colors flex items-center justify-between gap-2';
+          li.innerHTML = `<span><strong class="pointer-events-none">${mascararCNPJ(e.cnpj)}</strong></span> <span class="pl-2 truncate text-slate-500 font-sans text-xs flex-1 text-right pointer-events-none">${e.nome}</span>`;
+          li.addEventListener('mousedown', (evt) => {
+             evt.preventDefault(); // Previne o input de perder o foco logo antes do click
+             selecionarCnpj(e.cnpj, e.nome);
+          });
+          listaCnpj.appendChild(li);
+       });
+       listaCnpj.classList.remove('hidden');
+    }
+
+    function renderAutocompleteNome(empresas) {
+       if (empresas.length === 0) {
+          listaNome.classList.add('hidden');
+          return;
+       }
+       listaNome.innerHTML = '';
+       empresas.forEach(e => {
+          let li = document.createElement('li');
+          li.className = 'p-2 text-[13.5px] font-mono cursor-pointer hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 font-medium transition-colors flex items-center justify-between gap-2';
+          li.innerHTML = `<span class="truncate text-slate-700 font-sans text-xs flex-1 pointer-events-none">${e.nome}</span> <span><strong class="pointer-events-none text-slate-500">${mascararCNPJ(e.cnpj)}</strong></span>`;
+          li.addEventListener('mousedown', (evt) => {
+             evt.preventDefault();
+             selecionarNome(e.cnpj, e.nome);
+          });
+          listaNome.appendChild(li);
+       });
+       listaNome.classList.remove('hidden');
+    }
+
+    function selecionarNome(cnpj, nome) {
+       iptCnpj.value = mascararCNPJ(cnpj);
+       listaNome.classList.add('hidden');
+       
+       iptRazaoSocial.value = titleCase(nome);
+       iptRazaoSocial.readOnly = true;
+       iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed';
+       lblRazaoSocial.innerText = "Razão Social (Encontrado)";
+       lblRazaoSocial.className = 'text-[11px] font-bold text-emerald-700 uppercase transition-colors';
+       document.getElementById('boxNovaEmpresa').classList.add('hidden');
+       document.getElementById('boxNovaEmpresa').classList.remove('flex');
+       
+       setTimeout(() => iptNota.focus(), 10);
+    }
+
+    function selecionarCnpj(cnpj, nome) {
+       iptCnpj.value = mascararCNPJ(cnpj);
+       listaCnpj.classList.add('hidden');
+       
+       iptRazaoSocial.value = titleCase(nome);
+       iptRazaoSocial.readOnly = true;
+       iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed';
+       lblRazaoSocial.innerText = "Razão Social (Encontrado)";
+       lblRazaoSocial.className = 'text-[11px] font-bold text-emerald-700 uppercase transition-colors';
+       document.getElementById('boxNovaEmpresa').classList.add('hidden');
+       document.getElementById('boxNovaEmpresa').classList.remove('flex');
+       
+       setTimeout(() => iptNota.focus(), 10);
+    }
+
+    // Validate na saída do foco do CNPJ
+    iptCnpj.addEventListener('blur', async function() {
+       setTimeout(async () => {
+          if (!listaCnpj.classList.contains('hidden')) {
+              listaCnpj.classList.add('hidden');
+            iptRazaoSocial.value = "";
+            iptRazaoSocial.readOnly = false;
+            iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors';
+            lblRazaoSocial.innerText = "Razão Social";
+            lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+            document.getElementById('boxNovaEmpresa').classList.add('hidden');
+            document.getElementById('boxNovaEmpresa').classList.remove('flex');
+          }
+          
+          let raw = iptCnpj.value.replace(/[^\d]+/g, '');
+          if (!raw) {
+             iptRazaoSocial.value = "";
+             iptRazaoSocial.readOnly = false;
+             iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors';
+             lblRazaoSocial.innerText = "Razão Social";
+             lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+             document.getElementById('boxNovaEmpresa').classList.add('hidden');
+             document.getElementById('boxNovaEmpresa').classList.remove('flex');
+             return;
+          }
+          if (!validarCNPJ(this.value)) {
+             showToast('CNPJ inválido!', 'error');
+             this.value = '';
+             iptRazaoSocial.value = '';
+             document.getElementById('boxNovaEmpresa').classList.add('hidden');
+             document.getElementById('boxNovaEmpresa').classList.remove('flex');
+             setTimeout(() => this.focus(), 10);
+             return;
+          }
+          
+          let emp = null;
+          try {
+              const { data } = await supabase.from('empresas').select('*').eq('cnpj', raw).maybeSingle();
+              if (data) emp = { cnpj: data.cnpj, nome: data.razao_social };
+          } catch(e) {
+              console.error(e);
+          }
+          if (emp) {
+             iptRazaoSocial.value = titleCase(emp.nome);
+             iptRazaoSocial.readOnly = true;
+             iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed';
+             lblRazaoSocial.innerText = "Razão Social (Encontrado)";
+             lblRazaoSocial.className = 'text-[11px] font-bold text-emerald-700 uppercase transition-colors';
+             document.getElementById('boxNovaEmpresa').classList.add('hidden');
+             document.getElementById('boxNovaEmpresa').classList.remove('flex');
+          } else {
+             iptRazaoSocial.value = '';
+             iptRazaoSocial.readOnly = false;
+             iptRazaoSocial.placeholder = 'Digite o nome da empresa...';
+             iptRazaoSocial.className = 'border border-yellow-500 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm transition-colors';
+             lblRazaoSocial.innerText = "Razão Social (Nova Empresa)";
+             lblRazaoSocial.className = 'text-[11px] font-bold text-yellow-700 uppercase transition-colors';
+             document.getElementById('boxNovaEmpresa').classList.remove('hidden');
+             document.getElementById('boxNovaEmpresa').classList.add('flex');
+             showToast('CNPJ não cadastrado. Preencha o nome da empresa.', 'warning');
+          }
+       }, 50);
+    });
+
+    // d) PIS/COFINS Logic
+    let pisModificadoManualmente = false;
+
+    chkPis.addEventListener('change', function() {
+       if (this.checked) {
+           iptPisContainer.classList.remove('hidden');
+           iptPisContainer.classList.add('flex');
+           document.getElementById('boxPccTotal').classList.remove('hidden');
+           document.getElementById('boxPccManual').classList.remove('grid');
+           document.getElementById('boxPccManual').classList.add('hidden');
+           pisModificadoManualmente = false;
+           calcularPisCofins();
+           setTimeout(() => document.getElementById('btnEnviarNota').focus(), 10);
+       } else {
+           iptPisContainer.classList.add('hidden');
+           iptPisContainer.classList.remove('flex');
+           iptPIS.value = '';
+           iptCOFINS.value = '';
+           iptCSLL.value = '';
+           iptPisVal.value = '';
+           pisModificadoManualmente = false;
+       }
+    });
+
+    function ativarEdicaoPccManual() {
+       pisModificadoManualmente = true;
+       document.getElementById('boxPccTotal').classList.add('hidden');
+       document.getElementById('boxPccManual').classList.remove('hidden');
+       document.getElementById('boxPccManual').classList.add('grid');
+       iptPIS.focus();
+    }
+
+    function atualizarSomaPcc() {
+       pisModificadoManualmente = true;
+       let p = parseFloat(iptPIS.value) || 0;
+       let c = parseFloat(iptCOFINS.value) || 0;
+       let s = parseFloat(iptCSLL.value) || 0;
+       iptPisVal.value = (p + c + s).toFixed(2);
+       recalcularValorLiquido();
+    }
+
+    iptValorBruto.addEventListener('input', function() {
+       if (chkPis.checked && !pisModificadoManualmente) {
+           calcularPisCofins();
+       }
+    });
+
+    function calcularPisCofins() {
+       let bruto = parseFloat(iptValorBruto.value) || 0;
+       let pis = (bruto * 0.0065).toFixed(2);
+       let cofins = (bruto * 0.03).toFixed(2);
+       let csll = (bruto * 0.01).toFixed(2);
+       iptPIS.value = pis;
+       iptCOFINS.value = cofins;
+       iptCSLL.value = csll;
+       iptPisVal.value = (parseFloat(pis) + parseFloat(cofins) + parseFloat(csll)).toFixed(2);
+       recalcularValorLiquido();
+    }
+
+
+    // --- 5. CORE BUSINESS LOGIC (Enviar Nota) ---
+    async function enviarNota() {
+       // Validate required fields visually
+       const requireField = (val, fieldName) => { if(!val) { showToast(`Preencha o campo: ${fieldName}`, 'error'); return false; } return true; };
+       
+       if (!requireField(iptCondominio.value, 'Cód. Condomínio')) return;
+       if (iptCondominio.value.length !== 3) { showToast('Código do condomínio inválido.', 'error'); return; }
+       
+       if (!requireField(iptCnpj.value, 'CNPJ Emissor')) return;
+       let rawCnpj = iptCnpj.value.replace(/[^\d]+/g, '');
+       
+       if (!requireField(iptRazaoSocial.value, 'Razão Social da Empresa')) return;
+       if (!requireField(iptNota.value, 'Nº da Nota')) return;
+       
+       // a) Validação: Dia de Emissão
+       let diaDigitado = parseInt(iptDiaEmissao.value);
+       if (!diaDigitado || diaDigitado < 1 || diaDigitado > 31) {
+          showToast("Dia de Emissão inválido. Digite um valor entre 1 e 31.", "error");
+          iptDiaEmissao.focus();
+          return;
+       }
+
+       // b) Validação: Trava do ISS (> 10%)
+       let valBruto = parseFloat(iptValorBruto.value) || 0;
+       if (valBruto <= 0) { showToast('Valor bruto não pode ser zero.', 'error'); iptValorBruto.focus(); return; }
+       let issCalc = parseFloat(iptISS.value) || 0;
+       if (issCalc > (valBruto * 0.10)) {
+          showToast('ISS inválido: não pode ser maior que 10% do total.', 'error');
+          iptISS.focus();
+          return;
+       }
+
+       let refSelecionada = document.getElementById('txtReferencia').value;
+       if (!refSelecionada) {
+          showToast('Selecione uma Competência de Lançamento no topo da tela.', 'error');
+          return;
+       }
+
+       // c) Validação: Duplicidade de Nota no Período
+       let numNotaLimpo = iptNota.value.replace(/^0+/, '').trim() || '0';
+       let isDupe = false;
+       if (isDupe) {
+          showToast(`Transação Negada: Nota fiscal já consta no sistema para este CNPJ no período ${refSelecionada}.`, 'error');
+          iptNota.focus();
+          return;
+       }
+
+       // Validations Passed. Execute Save Flow.
+
+       // 1. Cadastra empresa se for nova
+       let isEmpresaNova = false; try { const { data } = await supabase.from('empresas').select('*').eq('cnpj', rawCnpj).maybeSingle(); if (!data) { await supabase.from('empresas').insert([{ cnpj: rawCnpj, razao_social: titleCase(iptRazaoSocial.value) }]); } } catch(e) {} let dummyVal = false;
+       if (isEmpresaNova) {
+          dbEmpresas.push({ cnpj: rawCnpj, nome: titleCase(iptRazaoSocial.value) });
+          renderEmpresas();
+       }
+
+       // 2. Monta Objeto NF
+       let oper = getOperador();
+       let diaStr = String(diaDigitado).padStart(2, '0');
+       let dataFormatada = `${diaStr}/${refSelecionada.split('-')[1]}/${refSelecionada.split('-')[0]}`;
+
+       let empAtualizada = null;
+       let nomeEmpresaFinal = empAtualizada ? empAtualizada.nome : titleCase(iptRazaoSocial.value);
+
+       let novaNota = {
+          codCond: iptCondominio.value,
+          nomeCond: titleCase(document.getElementById('lblHeaderCondominio').innerText),
+          cnpj: iptCnpj.value,
+          nomeEmp: nomeEmpresaFinal,
+          numNota: numNotaLimpo,
+          dataCompleta: dataFormatada,
+          referencia: refSelecionada,
+          valor: valBruto,
+          iss: issCalc,
+          inss: parseFloat(iptINSS.value) || 0,
+          ir: parseFloat(iptIR.value) || 0,
+          pisDigitado: chkPis.checked ? (parseFloat(iptPisVal.value)||0) : 0,
+          valPIS: chkPis.checked ? (parseFloat(iptPIS.value)||0) : 0,
+          valCOFINS: chkPis.checked ? (parseFloat(iptCOFINS.value)||0) : 0,
+          valCSLL: chkPis.checked ? (parseFloat(iptCSLL.value)||0) : 0,
+          operador: oper,
+          dataHora: formatDateTime(new Date())
+       };
+
+               try {
+            const { error: insertError } = await supabase.from('notas_fiscais').insert([{
+                condominio_codigo: iptCondominio.value,
+                empresa_cnpj: rawCnpj,
+                numero_nota: numNotaLimpo,
+                dia_emissao: diaDigitado,
+                data_consolidada: dataFormatada,
+                referencia: refSelecionada,
+                valor_bruto: valBruto,
+                iss: issCalc,
+                inss: parseFloat(iptINSS.value) || 0,
+                ir: parseFloat(iptIR.value) || 0,
+                is_pcc: chkPis.checked,
+                pis_digitado: chkPis.checked ? (parseFloat(iptPisVal.value) || 0) : 0,
+                val_pis: chkPis.checked ? (parseFloat(iptPIS.value) || 0) : 0,
+                val_cofins: chkPis.checked ? (parseFloat(iptCOFINS.value) || 0) : 0,
+                val_csll: chkPis.checked ? (parseFloat(iptCSLL.value) || 0) : 0,
+                criado_por: oper
+            }]);
+
+            if (insertError) {
+                if (insertError.code === '23505' || String(insertError.message).toLowerCase().includes('duplicate') || String(insertError.message).toLowerCase().includes('unique')) {
+                    showToast('Nota fiscal já consta na planilha.', 'error');
+                    iptNota.focus();
+                    return;
+                } else {
+                    showToast('Erro ao salvar nota fiscal: ' + insertError.message, 'error');
+                    return;
+                }
+            }
+        } catch (eInserted) {
+            console.error(eInserted);
+        } // Adds to beginning
+
+       // 3. Monta Log de Auditoria
+       dbAuditoria.unshift({
+           dataHora: formatDateTime(new Date()),
+           operador: oper,
+           acao: 'CREATE_INVOICE',
+           entidade: novaNota.codCond,
+           recurso: novaNota.cnpj,
+           descricao: `Ref: [NF ${novaNota.numNota}] - Valor: ${formatMoney(novaNota.valor)} - Emissor: ${novaNota.nomeEmp}`,
+           referencia: refSelecionada
+       });
+
+       try {
+            await supabase.from('logs_auditoria').insert([{
+                operador: oper,
+                acao: 'CREATE_INVOICE',
+                entidade: iptCondominio.value,
+                recurso: rawCnpj,
+                descricao: `Ref: [NF ${numNotaLimpo}] - Valor: ${formatMoney(valBruto)} - Emissor: ${nomeEmpresaFinal}`,
+                referencia: refSelecionada,
+                num_nota: numNotaLimpo
+            }]);
+        } catch (el) {}
+        // 4. Update UIs
+       renderNotas();
+       renderAuditoria();
+       
+       // 5. Cleanup Form
+       limparFormulario(false);
+       
+       // Feedback User
+       showToast('Nota fiscal lançada com sucesso!', 'success');
+       // Nota: Foco mantido no form (Aba não recarrega conforme instrução)
+       if(chkManterCNPJ.checked) document.getElementById('btnEnviarNota').focus();
+    }
+
+    function limparFormulario(forceClearAll = false) {
+       // Sempre limpa Condomínio
+       iptCondominio.value = '';
+       const lblHeader = document.getElementById('lblHeaderCondominio');
+       if (lblHeader) {
+           lblHeader.innerText = 'AGUARDANDO CONDOMÍNIO...';
+           lblHeader.className = 'text-xl font-black text-slate-800 uppercase tracking-wide';
+       }
+
+       if (forceClearAll || !chkManterCNPJ.checked) {
+          // Limpa CNPJ
+          iptCnpj.value = '';
+          iptRazaoSocial.value = '';
+          iptRazaoSocial.readOnly = false;
+          iptRazaoSocial.className = 'border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors';
+          lblRazaoSocial.innerText = "Razão Social";
+          lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+          document.getElementById('boxNovaEmpresa').classList.add('hidden');
+          document.getElementById('boxNovaEmpresa').classList.remove('flex');
+          
+          iptCondominio.focus();
+       } else {
+          // Mantem CNPJ e Foca no Codigo Condominio de novo (pois limpamos o condomínio)
+          iptCondominio.focus();
+       }
+
+       // Sempre limpa os dados financeiros e NF
+       iptNota.value = '';
+       iptDiaEmissao.value = '';
+       iptValorBruto.value = '';
+       iptISS.value = '';
+       iptINSS.value = '';
+       iptIR.value = '';
+       chkPis.checked = false;
+       iptPisContainer.classList.add('hidden');
+       iptPisContainer.classList.remove('flex');
+       document.getElementById('boxPccTotal').classList.remove('hidden');
+       document.getElementById('boxPccManual').classList.remove('grid');
+       document.getElementById('boxPccManual').classList.add('hidden');
+       iptPisVal.value = '';
+       iptPIS.value = '';
+       iptCOFINS.value = '';
+       iptCSLL.value = '';
+       pisModificadoManualmente = false;
+       recalcularValorLiquido();
+    }
+
+    // --- 6. RENDER DATA (DataGrids) ---
+    function togglePccCols() {
+       let cols = document.querySelectorAll('.col-pcc-det');
+       cols.forEach(c => {
+           if (c.classList.contains('hidden')) {
+               c.classList.remove('hidden');
+           } else {
+               c.classList.add('hidden');
+           }
+       });
+    }
+
+    async function renderNotas(fetchFirst = true) { if (fetchFirst) { await sincronizarDados('notas'); }
+       const grid = document.getElementById('gridNotas');
+       if (!grid) return;
+       const refAtual = document.getElementById('txtReferencia').value;
+       grid.innerHTML = '';
+       let filtradas = dbNotas.filter(n => n.referencia === refAtual);
+
+       // Apply Dynamic Search
+       const txtBuscaInput = document.getElementById('txtBuscaNotas');
+       const txtBusca = txtBuscaInput ? txtBuscaInput.value.trim().toLowerCase() : '';
+       if (txtBusca) {
+          // Clean numeric search query for unformatted CNPJ matching
+          const queryNum = txtBusca.replace(/[^\d]/g, '');
+
+          filtradas = filtradas.filter(n => {
+              let e = dbEmpresas.find(x => String(x.cnpj) === String(n.cnpj).replace(/[^\d]+/g, ''));
+              let nomeEmp = (e ? e.nome : n.nomeEmp || '').toLowerCase();
+              let cnpj = String(n.cnpj).toLowerCase();
+              let cnpjClean = cnpj.replace(/[^\d]/g, '');
+              let cnpjFormatted = mascararCNPJ(n.cnpj).toLowerCase();
+              let numNota = String(n.numNota).toLowerCase();
+              let codCond = String(n.codCond).toLowerCase();
+              let nomeCond = (n.nomeCond || '').toLowerCase();
+              let valor = String(n.valor).toLowerCase();
+              let valorFormatted = formatMoney(n.valor).toLowerCase();
+              let operador = String(n.operador || '').toLowerCase();
+
+              // Encargos values
+              let iss = String(n.iss || '').toLowerCase();
+              let issFormatted = formatMoney(n.iss || 0).toLowerCase();
+              let inss = String(n.inss || '').toLowerCase();
+              let inssFormatted = formatMoney(n.inss || 0).toLowerCase();
+              let ir = String(n.ir || '').toLowerCase();
+              let irFormatted = formatMoney(n.ir || 0).toLowerCase();
+              let pisDigitado = String(n.pisDigitado || '').toLowerCase();
+              let pisDigitadoFormatted = formatMoney(n.pisDigitado || 0).toLowerCase();
+              let valPIS = String(n.valPIS || '').toLowerCase();
+              let valPISFormatted = formatMoney(n.valPIS || 0).toLowerCase();
+              let valCOFINS = String(n.valCOFINS || '').toLowerCase();
+              let valCOFINSFormatted = formatMoney(n.valCOFINS || 0).toLowerCase();
+              let valCSLL = String(n.valCSLL || '').toLowerCase();
+              let valCSLLFormatted = formatMoney(n.valCSLL || 0).toLowerCase();
+
+              return nomeEmp.includes(txtBusca) ||
+                     cnpj.includes(txtBusca) ||
+                     (queryNum && cnpjClean.includes(queryNum)) ||
+                     cnpjFormatted.includes(txtBusca) ||
+                     numNota.includes(txtBusca) ||
+                     codCond.includes(txtBusca) ||
+                     nomeCond.includes(txtBusca) ||
+                     valor.includes(txtBusca) ||
+                     valorFormatted.includes(txtBusca) ||
+                     operador.includes(txtBusca) ||
+                     iss.includes(txtBusca) || issFormatted.includes(txtBusca) ||
+                     inss.includes(txtBusca) || inssFormatted.includes(txtBusca) ||
+                     ir.includes(txtBusca) || irFormatted.includes(txtBusca) ||
+                     pisDigitado.includes(txtBusca) || pisDigitadoFormatted.includes(txtBusca) ||
+                     valPIS.includes(txtBusca) || valPISFormatted.includes(txtBusca) ||
+                     valCOFINS.includes(txtBusca) || valCOFINSFormatted.includes(txtBusca) ||
+                     valCSLL.includes(txtBusca) || valCSLLFormatted.includes(txtBusca);
+          });
+       }
+
+       // Apply Encargos Filter
+       const fltISS = document.getElementById('fltISS').checked;
+       const fltINSS = document.getElementById('fltINSS').checked;
+       const fltIR = document.getElementById('fltIR').checked;
+       const fltPIS = document.getElementById('fltPIS').checked;
+
+       if (fltISS || fltINSS || fltIR || fltPIS) {
+          filtradas = filtradas.filter(n => {
+              if (fltISS && n.iss > 0) return true;
+              if (fltINSS && n.inss > 0) return true;
+              if (fltIR && n.ir > 0) return true;
+              if (fltPIS && n.pisDigitado > 0) return true;
+              return false;
+          });
+       }
+
+       // Sorting
+       if (sortState.notas.col) {
+          filtradas.sort((a,b) => {
+              let v1 = a[sortState.notas.col];
+              let v2 = b[sortState.notas.col];
+              
+              // Handle numeric sorting for strings like '10' and '5'
+              let n1 = parseFloat(v1);
+              let n2 = parseFloat(v2);
+              if (typeof v1 === 'number' || (!isNaN(n1) && !isNaN(n2))) {
+                  return sortState.notas.asc ? n1 - n2 : n2 - n1;
+              }
+              return sortState.notas.asc ? String(v1).localeCompare(String(v2), undefined, {numeric: true}) : String(v2).localeCompare(String(v1), undefined, {numeric: true});
+          });
+       }
+
+       filtradas.forEach(n => {
+          let uniqueId = String(n.cnpj) + '|' + String(n.numNota);
+          let e = dbEmpresas.find(x => String(x.cnpj) === String(n.cnpj).replace(/[^\d]+/g, ''));
+          let displayNomeEmp = e ? e.nome : n.nomeEmp;
+          grid.innerHTML += `
+            <tr class="hover:bg-blue-50 transition-colors cursor-pointer bg-white" ondblclick="startEditRow('notas', '${uniqueId}', this, event)">
+              <td class="p-2 text-center font-mono font-bold text-slate-600 bg-slate-100 border-r border-slate-200 editable-cell" data-prop="codCond">${n.codCond}</td>
+              <td class="p-2 font-medium truncate max-w-xs border-r border-slate-200" data-prop="nomeCond">${n.nomeCond}</td>
+              <td class="p-2 truncate font-mono text-slate-700 max-w-xs border-r border-slate-200 editable-cell" data-prop="cnpj">${mascararCNPJ(n.cnpj)}</td>
+              <td class="p-2 truncate max-w-sm border-r border-slate-200" data-prop="nomeEmp">${displayNomeEmp}</td>
+              <td class="p-2 text-center font-mono text-slate-800 font-bold border-r border-slate-200 editable-cell" data-prop="numNota">${n.numNota}</td>
+              <td class="p-2 text-center text-slate-600 border-r border-slate-200 editable-cell" data-prop="dataCompleta">${n.dataCompleta}</td>
+              <td class="p-2 text-right font-mono font-bold text-emerald-700 border-r border-slate-200 editable-cell" data-prop="valor">${formatMoney(n.valor)}</td>
+              <td class="p-2 text-right font-mono text-red-600 border-r border-slate-200 editable-cell" data-prop="iss">${formatMoney(n.iss)}</td>
+              <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" data-prop="inss">${formatMoney(n.inss)}</td>
+              <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" data-prop="ir">${formatMoney(n.ir)}</td>
+              <td class="p-2 text-right font-mono font-bold text-slate-800 bg-slate-100 border-r border-slate-200 editable-cell" data-prop="pisDigitado">${formatMoney(n.pisDigitado || 0)}</td>
+              <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det hidden editable-cell" data-prop="valPIS">${formatMoney(n.valPIS || 0)}</td>
+              <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det hidden editable-cell" data-prop="valCOFINS">${formatMoney(n.valCOFINS || 0)}</td>
+              <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det hidden editable-cell" data-prop="valCSLL">${formatMoney(n.valCSLL || 0)}</td>
+              <td class="p-2 text-center border-r border-slate-200"><span class="bg-blue-100 px-2 py-0.5 rounded text-[10px] font-black text-blue-800 align-middle">${n.operador}</span></td>
+              <td class="p-2 text-center">
+                 <button onclick="handleAcaoRow('notas', '${uniqueId}', this)" class="btn-acao p-1 rounded text-red-600 hover:bg-red-50 focus:outline-none transition-colors" title="Excluir">
+                   <span class="material-symbols-outlined text-[16px]">delete</span>
+                 </button>
+              </td>
+            </tr>
+          `;
+       });
+       document.getElementById('qtdeNotas').innerText = `TOTAL REGISTROS: ${filtradas.length}`;
+    }
+
+    async function renderEmpresas(fetchFirst = true) { if (fetchFirst) { await sincronizarDados('empresas'); }
+       const grid = document.getElementById('gridEmpresas');
+       grid.innerHTML = '';
+       let arr = [...dbEmpresas];
+       if (sortState.empresas.col) {
+          arr.sort((a,b) => {
+              let v1 = a[sortState.empresas.col];
+              let v2 = b[sortState.empresas.col];
+              return sortState.empresas.asc ? String(v1).localeCompare(v2) : String(v2).localeCompare(v1);
+          });
+       }
+
+       arr.forEach(e => {
+          let cnpjFormatado = mascararCNPJ(e.cnpj);
+          grid.innerHTML += `
+            <tr class="hover:bg-blue-50 cursor-pointer" ondblclick="startEditRow('empresas', '${e.cnpj}', this, event)">
+              <td class="p-3 font-mono font-black text-slate-700 border-r border-slate-200 editable-cell" data-prop="cnpj">${cnpjFormatado}</td>
+              <td class="p-3 font-bold text-slate-800 editable-cell" data-prop="nome">${e.nome}</td>
+              <td class="p-3 text-center">
+                 <button onclick="handleAcaoRow('empresas', '${e.cnpj}', this)" class="btn-acao p-1 rounded text-red-600 hover:bg-red-50 focus:outline-none transition-colors" title="Excluir">
+                   <span class="material-symbols-outlined text-[16px]">delete</span>
+                 </button>
+              </td>
+            </tr>
+          `;
+       });
+    }
+
+    async function renderCondominios(fetchFirst = true) { if (fetchFirst) { await sincronizarDados('condominios'); }
+       const grid = document.getElementById('gridCondominios');
+       grid.innerHTML = '';
+       
+       let arr = [...dbCondominios];
+       if (sortState.cond.col) {
+          arr.sort((a,b) => {
+              let v1 = a[sortState.cond.col];
+              let v2 = b[sortState.cond.col];
+              return sortState.cond.asc ? String(v1).localeCompare(v2) : String(v2).localeCompare(v1);
+          });
+       }
+
+       arr.forEach(c => {
+          grid.innerHTML += `
+            <tr class="hover:bg-blue-50 border-b border-slate-200 cursor-pointer" ondblclick="startEditRow('cond', '${c.codigo}', this, event)">
+              <td class="p-3 font-mono font-black text-center text-slate-700 bg-slate-50 border-r border-slate-200 editable-cell" data-prop="codigo">${c.codigo}</td>
+              <td class="p-3 font-bold text-slate-800 text-xs editable-cell" data-prop="nome">${c.nome}</td>
+              <td class="p-3 text-center">
+                 <button onclick="handleAcaoRow('cond', '${c.codigo}', this)" class="btn-acao p-1 rounded text-red-600 hover:bg-red-50 focus:outline-none transition-colors" title="Excluir">
+                   <span class="material-symbols-outlined text-[16px]">delete</span>
+                 </button>
+              </td>
+            </tr>
+          `;
+       });
+    }
+
+    function parseLogDate(dataHoraStr) {
+        if (!dataHoraStr) return null;
+        const parts = dataHoraStr.split(' ');
+        const dateParts = parts[0].split('/');
+        if (dateParts.length === 3) {
+            const day = parseInt(dateParts[0], 10);
+            const month = parseInt(dateParts[1], 10) - 1;
+            const year = parseInt(dateParts[2], 10);
+            
+            let hour = 0, min = 0, sec = 0;
+            if (parts.length > 1) {
+                const timeParts = parts[1].split(':');
+                if (timeParts.length >= 2) {
+                    hour = parseInt(timeParts[0], 10);
+                    min = parseInt(timeParts[1], 10);
+                    if (timeParts.length > 2) {
+                        sec = parseInt(timeParts[2], 10);
+                    }
+                }
+            }
+            return new Date(year, month, day, hour, min, sec);
+        }
+        return null;
+    }
+
+    function getNumNotaFromLog(a) {
+        if (a.numNota) return a.numNota;
+        const match = String(a.descricao || '').match(/\[NF\s+(\d+)\]/i);
+        if (match) return match[1];
+        return '-';
+    }
+
+    async function renderAuditoria(fetchFirst = true) { if (fetchFirst) { await sincronizarDados('auditoria'); }
+       const grid = document.getElementById('gridAuditoria');
+       if (!grid) return;
+       grid.innerHTML = '';
+       
+       let filtrados = [...dbAuditoria];
+
+       // Dynamic Search inside Log de Auditoria
+       const txtBuscaAudInput = document.getElementById('txtBuscaAuditoria');
+       const txtBuscaAud = txtBuscaAudInput ? txtBuscaAudInput.value.trim().toLowerCase() : '';
+       if (txtBuscaAud) {
+           filtrados = filtrados.filter(a => {
+               let dataHora = String(a.dataHora || '').toLowerCase();
+               let operador = String(a.operador || '').toLowerCase();
+               let acao = String(a.acao || '').toLowerCase();
+               let numNota = String(getNumNotaFromLog(a) || '').toLowerCase();
+               let entidade = String(a.entidade || '').toLowerCase();
+               let recurso = String(a.recurso || '').toLowerCase();
+               let descricao = String(a.descricao || '').toLowerCase();
+               
+               return dataHora.includes(txtBuscaAud) ||
+                      operador.includes(txtBuscaAud) ||
+                      acao.includes(txtBuscaAud) ||
+                      numNota.includes(txtBuscaAud) ||
+                      entidade.includes(txtBuscaAud) ||
+                      recurso.includes(txtBuscaAud) ||
+                      descricao.includes(txtBuscaAud);
+           });
+       }
+       
+       // 1. Filter by Action type
+       const actionFilter = document.getElementById('fltLogAcao').value;
+       if (actionFilter === 'CREATE_ONLY') {
+           filtrados = filtrados.filter(a => a.acao === 'CREATE_INVOICE');
+       } else if (actionFilter === 'UPDATE_ONLY') {
+           filtrados = filtrados.filter(a => a.acao !== 'CREATE_INVOICE');
+       }
+       
+       // 2. Filter by Period (mensal, anual, custom)
+       const periodType = document.getElementById('fltLogPeriodo').value;
+       const refVal = document.getElementById('txtReferencia').value; // 'YYYY-MM'
+       
+       if (periodType === 'mensal') {
+           if (refVal) {
+               const parts = refVal.split('-');
+               const refYear = parts[0];
+               const refMonth = parts[1];
+               filtrados = filtrados.filter(a => {
+                   const d = parseLogDate(a.dataHora);
+                   if (!d) return false;
+                   const yr = d.getFullYear().toString();
+                   const mo = (d.getMonth() + 1).toString().padStart(2, '0');
+                   return yr === refYear && mo === refMonth;
+               });
+           }
+       } else if (periodType === 'anual') {
+           if (refVal) {
+               const refYear = refVal.split('-')[0];
+               filtrados = filtrados.filter(a => {
+                   const d = parseLogDate(a.dataHora);
+                   if (!d) return false;
+                   return d.getFullYear().toString() === refYear;
+               });
+           }
+       } else if (periodType === 'custom') {
+           const dateIniStr = document.getElementById('fltLogDataIni').value; // 'YYYY-MM-DD'
+           const dateFimStr = document.getElementById('fltLogDataFim').value; // 'YYYY-MM-DD'
+           
+           let dIni = dateIniStr ? new Date(dateIniStr + 'T00:00:00') : null;
+           let dFim = dateFimStr ? new Date(dateFimStr + 'T23:59:59') : null;
+           
+           filtrados = filtrados.filter(a => {
+               const d = parseLogDate(a.dataHora);
+               if (!d) return false;
+               if (dIni && d < dIni) return false;
+               if (dFim && d > dFim) return false;
+               return true;
+           });
+       }
+       
+       // 3. Sort/Ordem of Execution
+       const order = document.getElementById('fltLogOrdem').value;
+       filtrados.sort((a, b) => {
+           const t1 = parseLogDate(a.dataHora)?.getTime() || 0;
+           const t2 = parseLogDate(b.dataHora)?.getTime() || 0;
+           return order === 'asc' ? t1 - t2 : t2 - t1;
+       });
+       
+       // 4. Render Table Row Markup
+       filtrados.forEach(a => {
+           const numNotaDisplay = getNumNotaFromLog(a);
+           let statusClass = 'bg-slate-200 text-slate-800 border-slate-300';
+           if (a.acao === 'CREATE_INVOICE') {
+               statusClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+           } else if (a.acao.startsWith('UPDATE_')) {
+               statusClass = 'bg-indigo-100 text-indigo-800 border-indigo-300';
+           }
+           
+           grid.innerHTML += `
+             <tr class="hover:bg-yellow-50 cursor-crosshair transition-colors border-b border-slate-200">
+               <td class="p-2.5 border-r border-slate-200 font-bold text-slate-800">${a.dataHora}</td>
+               <td class="p-2.5 border-r border-slate-200 font-bold text-blue-700 text-center">${a.operador}</td>
+               <td class="p-2.5 border-r border-slate-200 text-center">
+                  <span class="${statusClass} border px-2 py-0.5 rounded font-black tracking-tight text-[10px] block">${a.acao}</span>
+               </td>
+               <td class="p-2.5 border-r border-slate-200 font-mono font-bold text-[11px] text-center text-slate-800 bg-slate-50">${numNotaDisplay}</td>
+               <td class="p-2.5 border-r border-slate-200 text-center font-bold">${a.entidade}</td>
+               <td class="p-2.5 border-r border-slate-200 font-mono text-[10px] text-center">${a.recurso}</td>
+               <td class="p-2.5 max-w-sm truncate" title="${a.descricao}">${a.descricao}</td>
+             </tr>
+           `;
+       });
+    }
+
+    // --- EDIÇÃO INLINE E EXCLUSÃO ---
+    let currentRowInEdit = null;
+
+    // Custom Confirm Dialog
+    function showConfirm(message, onConfirm, onCancel) {
+        let overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm';
+        overlay.innerHTML = `
+            <div class="bg-white rounded shadow-2xl p-6 w-96 max-w-[90%] transform transition-all scale-100">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">${message}</h3>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium transition-colors" id="btnConfirmNo">Não</button>
+                    <button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium transition-colors" id="btnConfirmYes">Sim</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#btnConfirmNo').addEventListener('click', () => {
+            document.body.removeChild(overlay);
+            if (onCancel) onCancel();
+        });
+        overlay.querySelector('#btnConfirmYes').addEventListener('click', () => {
+            document.body.removeChild(overlay);
+            if (onConfirm) onConfirm();
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.fixed.inset-0')) return;
+        if (currentRowInEdit && !currentRowInEdit.contains(e.target)) {
+            let editingBtn = currentRowInEdit.querySelector('.btn-acao');
+            if (editingBtn && editingBtn.dataset.editing === 'true') {
+                 e.preventDefault();
+                 e.stopPropagation();
+                 
+                 // Evitar multiplos modais
+                 if (document.querySelector('.fixed.inset-0.bg-black\\/60')) return;
+
+                 showConfirm('Deseja salvar as alterações em andamento?', 
+                     () => { // Sim (Salvar)
+                         editingBtn.click();
+                     }, 
+                     () => { // Não (Descartar)
+                         endEditRow(currentRowInEdit);
+                         showToast('Edição cancelada.', 'info');
+                         renderNotas();
+                         renderEmpresas();
+                         renderCondominios();
+                     }
+                 );
+            }
+        }
+    }, true);
+
+    function applyMaskToContentEditable(el, maskFn) {
+        let sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        let range = sel.getRangeAt(0);
+        
+        let preCursorText = el.innerText.substring(0, range.startOffset);
+        let rawDigitsBeforeCursor = preCursorText.replace(/\D/g, '').length;
+        
+        let rawVal = el.innerText.replace(/\D/g, '');
+        let formattedVal = maskFn(rawVal);
+        
+        if (el.innerText !== formattedVal) {
+            el.innerText = formattedVal;
+            
+            let newPos = 0;
+            let digitsMatched = 0;
+            for (let i = 0; i < formattedVal.length; i++) {
+                if (/\d/.test(formattedVal[i])) {
+                    digitsMatched++;
+                }
+                if (digitsMatched === rawDigitsBeforeCursor) {
+                    newPos = i + 1;
+                    while (newPos < formattedVal.length && !/\d/.test(formattedVal[newPos])) {
+                        newPos++;
+                    }
+                    break;
+                }
+            }
+            if (rawDigitsBeforeCursor === 0) newPos = 0;
+            
+            if (el.firstChild) {
+                let newRange = document.createRange();
+                newRange.setStart(el.firstChild, Math.min(newPos, el.firstChild.length));
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+            }
+        }
+    }
+
+    function startEditRow(gridName, id, trEl, event) {
+        if (currentRowInEdit && currentRowInEdit !== trEl) {
+             endEditRow(currentRowInEdit);
+        }
+        currentRowInEdit = trEl;
+        let btnObj = trEl.querySelector('.btn-acao');
+        if (btnObj.dataset.editing === 'true') return;
+
+        btnObj.dataset.editing = 'true';
+        btnObj.innerHTML = '<span class="material-symbols-outlined text-[16px]">save</span>';
+        btnObj.classList.replace('text-red-600', 'text-emerald-700');
+        btnObj.classList.replace('hover:bg-red-50', 'hover:bg-emerald-50');
+
+        let tds = trEl.querySelectorAll('.editable-cell');
+        tds.forEach(td => {
+            td.contentEditable = "true";
+            td.classList.add('bg-yellow-50', 'border-2', 'border-yellow-400', 'outline-none');
+            
+            // Recálculo real-time do PCC
+            if (['valPIS', 'valCOFINS', 'valCSLL'].includes(td.dataset.prop)) {
+                td.addEventListener('input', function() {
+                    let tr = this.closest('tr');
+                    let p = parseMoney(tr.querySelector('[data-prop="valPIS"]').innerText);
+                    let c = parseMoney(tr.querySelector('[data-prop="valCOFINS"]').innerText);
+                    let s = parseMoney(tr.querySelector('[data-prop="valCSLL"]').innerText);
+                    tr.querySelector('[data-prop="pisDigitado"]').innerText = formatMoney(p + c + s);
+                });
+            }
+            
+            td.addEventListener('focus', function() {
+                let range = document.createRange();
+                range.selectNodeContents(this);
+                let sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            });
+
+            td.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
+            
+            // Mascara e validação de Cód Condominio inline
+            if (td.dataset.prop === 'codCond' || td.dataset.prop === 'codigo') {
+                td.addEventListener('input', function(e) {
+                    if (e.inputType === 'deleteContentBackward') return;
+                    let v = this.innerText;
+                    if (v.length > 3) {
+                        this.innerText = v.substring(0, 3);
+                        let sel = window.getSelection();
+                        let range = document.createRange();
+                        range.setStart(this.firstChild, 3);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                });
+            }
+
+            // Mascara e validação de CNPJ inline
+            if (td.dataset.prop === 'cnpj') {
+                td.addEventListener('input', function(e) {
+                    if (e.inputType === 'deleteContentBackward') return;
+                    applyMaskToContentEditable(this, function(val) {
+                        if (val.length > 14) val = val.substring(0, 14);
+                        return mascararCNPJ(val);
+                    });
+                });
+                td.addEventListener('blur', function() {
+                     this.innerText = mascararCNPJ(this.innerText);
+                });
+            }
+
+            // Mascara simples de data inline
+            if (td.dataset.prop === 'dataCompleta') {
+                td.addEventListener('input', function(e) {
+                    if (e.inputType === 'deleteContentBackward') return;
+                    applyMaskToContentEditable(this, function(val) {
+                        val = val.replace(/\D/g, "");
+                        if (val.length > 8) val = val.substring(0, 8);
+                        if (val.length >= 5) {
+                            return val.replace(/^(\d{2})(\d{2})(.*)/, "$1/$2/$3");
+                        } else if (val.length >= 3) {
+                            return val.replace(/^(\d{2})(.*)/, "$1/$2");
+                        }
+                        return val;
+                    });
+                });
+            }
+
+            // Tratamento de numNota
+            if (td.dataset.prop === 'numNota') {
+                td.addEventListener('blur', function() {
+                     this.innerText = this.innerText.replace(/^0+/, '') || '0';
+                });
+            }
+        });
+        
+        showToast('Modo de edição ativo. Altere a célula e clique fora para salvar.', 'info');
+        if (event) {
+            let clickedTd = event.target.closest('.editable-cell');
+            if (clickedTd) {
+                setTimeout(() => clickedTd.focus(), 10);
+            }
+        }
+    }
+
+    function endEditRow(trEl) {
+        let btnObj = trEl.querySelector('.btn-acao');
+        if (!btnObj) return;
+        btnObj.dataset.editing = 'false';
+        btnObj.innerHTML = '<span class="material-symbols-outlined text-[16px]">delete</span>';
+        btnObj.classList.replace('text-emerald-700', 'text-red-600');
+        btnObj.classList.replace('hover:bg-emerald-50', 'hover:bg-red-50');
+
+        let tds = trEl.querySelectorAll('.editable-cell');
+        tds.forEach(td => {
+            td.contentEditable = "false";
+            td.classList.remove('bg-yellow-50', 'border-2', 'border-yellow-400', 'outline-none');
+        });
+        currentRowInEdit = null;
+    }
+
+    function handleAcaoRow(gridName, id, btnObj) {
+        try {
+            let trEl = btnObj.closest('tr');
+            if (btnObj.dataset.editing === 'true') {
+                saveRow(gridName, id, trEl);
+                endEditRow(trEl);
+            } else {
+                deleteRow(gridName, id);
+            }
+        } catch(e) {
+            console.error(e);
+            showToast('Erro ao executar ação.', 'error');
+        }
+    }
+
+    function saveRow(gridName, id, trEl) {
+        let tds = trEl.querySelectorAll('.editable-cell');
+        let refSelecionada = document.getElementById('txtReferencia').value;
+        let oper = getOperador();
+        
+        // Validação preventiva de CNPJ
+        for (let i = 0; i < tds.length; i++) {
+            if (tds[i].dataset.prop === 'cnpj') {
+                let text = tds[i].innerText.replace(/[^\d]+/g, '');
+                if (!validarCNPJ(text)) {
+                    showToast('O CNPJ informado não é válido.', 'error');
+                    throw new Error('CNPJ inválido');
+                }
+            }
+        }
+        
+        if (gridName === 'empresas') {
+            let emp = dbEmpresas.find(e => String(e.cnpj) === String(id));
+            if (!emp) return;
+            tds.forEach(td => {
+                let text = td.innerText.trim();
+                let prop = td.dataset.prop;
+                if (prop === 'cnpj') emp.cnpj = text.replace(/[^\d]+/g, '');
+                if (prop === 'nome') emp.nome = text; // respeitar a formatação digitada
+            });
+            // Update past notes
+            dbNotas.forEach(n => {
+                if (String(n.cnpj) === String(emp.cnpj)) {
+                    n.nomeEmp = emp.nome;
+                }
+            });
+            
+            dbAuditoria.unshift({
+                dataHora: formatDateTime(new Date()),
+                operador: oper,
+                acao: 'UPDATE_EMPRESA',
+                entidade: emp.cnpj,
+                recurso: emp.nome,
+                descricao: `Alteração inline de dados da empresa`,
+                referencia: refSelecionada
+            });
+            
+            (async () => {
+                try {
+                    await supabase.from('empresas').update({
+                        cnpj: emp.cnpj,
+                        razao_social: emp.nome
+                    }).eq('cnpj', id);
+                    await supabase.from('logs_auditoria').insert([{
+                        operador: oper,
+                        acao: 'UPDATE_EMPRESA',
+                        entidade: emp.cnpj,
+                        recurso: emp.nome,
+                        descricao: `Alteração inline de dados da empresa`,
+                        referencia: refSelecionada
+                    }]);
+                } catch(e) { console.error(e); }
+                showToast('Empresa atualizada.', 'success');
+                renderNotas();
+                renderEmpresas();
+                renderAuditoria();
+            })();
+        }
+        else if (gridName === 'cond') {
+            let cnd = dbCondominios.find(c => String(c.codigo) === String(id));
+            if (!cnd) return;
+            tds.forEach(td => {
+                let val = td.innerText.trim();
+                let prop = td.dataset.prop;
+                if (prop === 'codigo') cnd.codigo = val.toUpperCase();
+                if (prop === 'nome') cnd.nome = titleCase(val);
+            });
+            // Update past notes
+            dbNotas.forEach(n => {
+                if (String(n.codCond) === String(cnd.codigo)) {
+                    n.nomeCond = cnd.nome;
+                }
+            });
+            
+            dbAuditoria.unshift({
+                dataHora: formatDateTime(new Date()),
+                operador: oper,
+                acao: 'UPDATE_CONDOMINIO',
+                entidade: cnd.codigo,
+                recurso: cnd.nome,
+                descricao: `Alteração inline de dados do condomínio`,
+                referencia: refSelecionada
+            });
+            
+            (async () => {
+                try {
+                    await supabase.from('condominios').update({
+                        codigo: cnd.codigo,
+                        razao_social: cnd.nome
+                    }).eq('codigo', id);
+                    await supabase.from('logs_auditoria').insert([{
+                        operador: oper,
+                        acao: 'UPDATE_CONDOMINIO',
+                        entidade: cnd.codigo,
+                        recurso: cnd.nome,
+                        descricao: `Alteração inline de dados do condomínio`,
+                        referencia: refSelecionada
+                    }]);
+                } catch(e) { console.error(e); }
+                showToast('Condomínio atualizado.', 'success');
+                renderNotas();
+                renderCondominios();
+                renderAuditoria();
+            })();
+        }
+        else if (gridName === 'notas') {
+            let nota = dbNotas.find(n => (n.cnpj + '|' + n.numNota) === id);
+            if (!nota) return;
+            let pccChanged = false;
+            tds.forEach(td => {
+                let text = td.innerText.trim();
+                let prop = td.dataset.prop;
+                if (prop === 'codCond') { nota.codCond = text; let c = dbCondominios.find(x => x.codigo === text); if(c) nota.nomeCond = c.nome; }
+                if (prop === 'numNota') nota.numNota = text.replace(/^0+/, '') || '0';
+                if (prop === 'cnpj') { 
+                     let c = text.replace(/[^\d]+/g, '');
+                     if (validarCNPJ(c)) {
+                         nota.cnpj = c;
+                         let e = dbEmpresas.find(x => x.cnpj === c);
+                         if(e) nota.nomeEmp = e.nome;
+                         else {
+                              let novoNome = prompt('CNPJ não cadastrado. Insira a Razão Social:');
+                              if(novoNome && novoNome.trim()) {
+                                  nota.nomeEmp = titleCase(novoNome.trim());
+                                  dbEmpresas.push({cnpj: c, nome: nota.nomeEmp});
+                                  renderEmpresas();
+                              }
+                         }
+                     }
+                }
+                if (prop === 'dataCompleta') {
+                     nota.dataCompleta = text;
+                     let parts = text.split('/');
+                     if (parts.length === 3 && parts[2].length === 4) {
+                         nota.referencia = parts[2] + '-' + parts[1];
+                     }
+                }
+                if (prop === 'valor') nota.valor = parseMoney(text);
+                if (prop === 'iss') nota.iss = parseMoney(text);
+                if (prop === 'inss') nota.inss = parseMoney(text);
+                if (prop === 'ir') nota.ir = parseMoney(text);
+                if (prop === 'pisDigitado') nota.pisDigitado = parseMoney(text);
+                if (prop === 'valPIS') { let v=parseMoney(text); if (v!==nota.valPIS) {pccChanged=true;nota.valPIS=v;}}
+                if (prop === 'valCOFINS') { let v=parseMoney(text); if (v!==nota.valCOFINS) {pccChanged=true;nota.valCOFINS=v;}}
+                if (prop === 'valCSLL') { let v=parseMoney(text); if (v!==nota.valCSLL) {pccChanged=true;nota.valCSLL=v;}}
+            });
+            if (pccChanged) nota.pisDigitado = (nota.valPIS||0) + (nota.valCOFINS||0) + (nota.valCSLL||0);
+            
+            dbAuditoria.unshift({
+                dataHora: formatDateTime(new Date()),
+                operador: oper,
+                acao: 'UPDATE_INVOICE',
+                entidade: nota.codCond,
+                recurso: nota.cnpj,
+                descricao: `Alteração inline da [NF ${nota.numNota}] - Valor Atual: ${formatMoney(nota.valor)}`,
+                referencia: refSelecionada,
+                numNota: nota.numNota
+            });
+            
+            (async () => {
+                try {
+                    let diaEmissao = 1;
+                    let parts = nota.dataCompleta.split('/');
+                    if (parts.length > 0) diaEmissao = parseInt(parts[0]) || 1;
+
+                    await supabase.from('notas_fiscais').update({
+                        condominio_codigo: nota.codCond,
+                        empresa_cnpj: nota.cnpj,
+                        numero_nota: nota.numNota,
+                        dia_emissao: diaEmissao,
+                        data_consolidada: nota.dataCompleta,
+                        referencia: nota.referencia,
+                        valor_bruto: nota.valor,
+                        iss: nota.iss,
+                        inss: nota.inss,
+                        ir: nota.ir,
+                        is_pcc: (nota.pisDigitado > 0 || nota.valPIS > 0 || nota.valCOFINS > 0 || nota.valCSLL > 0),
+                        pis_digitado: nota.pisDigitado,
+                        val_pis: nota.valPIS,
+                        val_cofins: nota.valCOFINS,
+                        val_csll: nota.valCSLL
+                    }).eq('id', nota.id);
+
+                    await supabase.from('logs_auditoria').insert([{
+                        operador: oper,
+                        acao: 'UPDATE_INVOICE',
+                        entidade: nota.codCond,
+                        recurso: nota.cnpj,
+                        descricao: `Alteração inline da [NF ${nota.numNota}] - Valor Atual: ${formatMoney(nota.valor)}`,
+                        referencia: refSelecionada,
+                        num_nota: nota.numNota
+                    }]);
+                } catch(e) { console.error(e); }
+                showToast('Nota atualizada.', 'success');
+                renderNotas();
+                renderAuditoria();
+            })();
+        }
+    }
+
+    function deleteRow(gridName, id) {
+        showConfirm('Tem certeza que deseja excluir esta linha permanentemente?', () => {
+            (async () => {
+                let oper = getOperador();
+                let refSelecionada = document.getElementById('txtReferencia').value;
+                try {
+                    if (gridName === 'empresas') {
+                        await supabase.from('empresas').delete().eq('cnpj', id);
+                        await supabase.from('logs_auditoria').insert([{
+                            operador: oper,
+                            acao: 'DELETE_EMPRESA',
+                            entidade: id,
+                            recurso: '',
+                            descricao: `Exclusão da empresa CNPJ: ${id}`,
+                            referencia: refSelecionada
+                        }]);
+                    }
+                    if (gridName === 'cond') {
+                        await supabase.from('condominios').delete().eq('codigo', id);
+                        await supabase.from('logs_auditoria').insert([{
+                            operador: oper,
+                            acao: 'DELETE_CONDOMINIO',
+                            entidade: id,
+                            recurso: '',
+                            descricao: `Exclusão do condomínio código: ${id}`,
+                            referencia: refSelecionada
+                        }]);
+                    }
+                    if (gridName === 'notas') {
+                        let nota = dbNotas.find(n => (n.cnpj + '|' + n.numNota) === id);
+                        if (nota && nota.id) {
+                            await supabase.from('notas_fiscais').delete().eq('id', nota.id);
+                            await supabase.from('logs_auditoria').insert([{
+                                operador: oper,
+                                acao: 'DELETE_INVOICE',
+                                entidade: nota.codCond,
+                                recurso: nota.cnpj,
+                                descricao: `Exclusão da [NF ${nota.numNota}]`,
+                                referencia: refSelecionada,
+                                num_nota: nota.numNota
+                            }]);
+                        }
+                    }
+                } catch(e) { console.error(e); }
+                showToast('Registro excluído!', 'warning');
+                renderNotas();
+                renderEmpresas();
+                renderCondominios();
+                renderAuditoria();
+            })();
+            return;
+            if (gridName === 'notas') dbNotas = dbNotas.filter(n => (n.cnpj + '|' + n.numNota) !== id);
+            
+            showToast('Registro excluído!', 'warning');
+            renderNotas();
+            renderEmpresas();
+            renderCondominios();
+        });
+    }
+
+    // --- 7. TAB NAVIGATION (Excel Style) ---
+    function alterarAba(tabId) {
+      const conteudos = document.querySelectorAll('.aba-conteudo');
+      conteudos.forEach(conteudo => conteudo.classList.add('hidden'));
+
+      const abaAtiva = document.getElementById(tabId);
+      if (abaAtiva) abaAtiva.classList.remove('hidden');
+
+      const botoesIds = ['btn-tab-notas', 'btn-tab-lancar', 'btn-tab-empresas', 'btn-tab-condominios', 'btn-tab-auditoria'];
+      
+      botoesIds.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+          btn.classList.remove('aba-ativa');
+          btn.classList.add('aba-inativa');
+        }
+      });
+
+      const botaoAtual = document.getElementById('btn-' + tabId);
+      if (botaoAtual) {
+        botaoAtual.classList.remove('aba-inativa');
+        botaoAtual.classList.add('aba-ativa');
+      }
+    }
+
+    // --- 8. INIT PERSISTENCE & AUTHENTICATION ---
+    function mostrarTelaPrimeiroAcesso() {
+       document.getElementById('box-login').classList.add('hidden');
+       document.getElementById('box-cadastro').classList.remove('hidden');
+    }
+
+    function mostrarTelaLogin() {
+       document.getElementById('box-cadastro').classList.add('hidden');
+       document.getElementById('box-login').classList.remove('hidden');
+    }
+
+    function logarUsuario(nome) {
+       document.getElementById('nome-operador').innerText = nome;
+       document.getElementById('tela-autenticacao').classList.add('hidden');
+       document.getElementById('tela-dashboard').classList.remove('hidden');
+       
+       // Setup Month Indicator
+       const now = new Date();
+       const anoStr = now.getFullYear();
+       const mesStr = String(now.getMonth() + 1).padStart(2, '0');
+       let currentRef = document.getElementById('txtReferencia').value;
+       if (!currentRef) {
+           syncReferencia(`${anoStr}-${mesStr}`);
+       } else {
+           renderNotas();
+           renderAuditoria();
+       }
+       renderEmpresas();
+       renderCondominios();
+       
+       // Default Tab
+       alterarAba('tab-notas');
+    }
+
+    async function executarLogin() {
+       const email = document.getElementById('txtEmail').value.trim();
+       const senha = document.getElementById('txtSenha').value;
+       
+       if (!email || !senha) {
+           showToast('Preencha o e-mail e a senha.', 'error');
+           return;
+       }
+       
+       /*
+       let cadastros = [];
+       try {
+           const salvo = localStorage.getItem('cadastrosUsuarios');
+           if (salvo) cadastros = JSON.parse(salvo);
+       } catch(e) {}
+       
+       // Standard hardcoded credentials
+       if (email === 'teste@empresa.com' && (senha === '123' || senha === '1253')) {
+           const nome = 'Operador Teste';
+           const user = { email, nome };
+           localStorage.setItem('usuarioAutenticado', JSON.stringify(user));
+           logarUsuario(nome);
+           showToast('Acesso concedido. Bem-vindo!', 'success');
+           return;
+       }
+       
+       // Check matching user from guest registrations
+       const match = cadastros.find(u => u.email.toLowerCase() === email.toLowerCase() && u.senha === senha);
+       if (match) {
+           const user = { email: match.email, nome: match.nome };
+           localStorage.setItem('usuarioAutenticado', JSON.stringify(user));
+           logarUsuario(match.nome);
+           showToast(`Acesso concedido. Bem-vindo, ${match.nome}!`, 'success');
+           return;
+       }
+       
+       showToast('Credenciais inválidas.', 'error');
+       */
+
+       if (!supabase) {
+           showToast('Supabase não configurado ou offline.', 'error');
+           return;
+       }
+
+       try {
+           showToast('Autenticando...', 'info');
+           const { data, error } = await supabase.auth.signInWithPassword({
+               email: email,
+               password: senha
+           });
+
+           if (error) {
+               showToast(`Falha no login: ${error.message || 'Credenciais inválidas'}`, 'error');
+               return;
+           }
+
+           if (data && data.user) {
+               const chkLembrarEmail = document.getElementById('chkLembrarEmail');
+               if (chkLembrarEmail && chkLembrarEmail.checked) {
+                   localStorage.setItem('lembrar_email', email);
+               } else {
+                   localStorage.removeItem('lembrar_email');
+               }
+
+               const nome = data.user.user_metadata?.full_name || data.user.email || 'Operador';
+               logarUsuario(nome);
+               showToast(`Acesso concedido. Bem-vindo, ${nome}!`, 'success');
+           }
+       } catch (e) {
+           showToast(`Erro ao realizar login: ${e.message || e}`, 'error');
+       }
+    }
+
+    async function executarCadastro() {
+       const nome = document.getElementById('txtNomeUsuario').value.trim();
+       const email = document.getElementById('txtEmailCadastro').value.trim();
+       const senha = document.getElementById('txtNovaSenha').value;
+       const confirmar = document.getElementById('txtConfirmarSenha').value;
+       
+       if (!nome) { showToast('Nome completo é obrigatório.', 'error'); return; }
+       if (!email) { showToast('E-mail é obrigatório.', 'error'); return; }
+       if (!senha) { showToast('Senha é obrigatória.', 'error'); return; }
+       if (senha !== confirmar) { showToast('As senhas não conferem.', 'error'); return; }
+
+        if (!supabase) {
+            showToast('Supabase não configurado.', 'error');
+            return;
+        }
+
+        try {
+            showToast('Definindo cadastro...', 'info');
+            const { data, error } = await supabase.auth.updateUser({
+                password: senha,
+                data: { full_name: nome }
+            });
+
+            if (error) {
+                showToast(`Falha ao definir cadastro: ${error.message || error}`, 'error');
+                return;
+            }
+
+            if (data && data.user) {
+                showToast('Cadastro definido e ativado com sucesso!', 'success');
+                logarUsuario(nome);
+            }
+        } catch (e) {
+            showToast(`Erro no cadastro: ${e.message || e}`, 'error');
+        }
+        return;
+       
+       let cadastros = [];
+       try {
+           const salvo = localStorage.getItem('cadastrosUsuarios');
+           if (salvo) cadastros = JSON.parse(salvo);
+       } catch(e) {}
+       
+       if (cadastros.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+           showToast('E-mail já cadastrado.', 'error');
+           return;
+       }
+       
+       const novoUsuario = { nome, email, senha };
+       cadastros.push(novoUsuario);
+       localStorage.setItem('cadastrosUsuarios', JSON.stringify(cadastros));
+       
+       // Auto-login user
+       const user = { email, nome };
+       localStorage.setItem('usuarioAutenticado', JSON.stringify(user));
+       logarUsuario(nome);
+       
+       showToast('Cadastro ativado com sucesso!', 'success');
+    }
+
+    async function fazerLogout() {
+        if (supabase) {
+            try {
+                await supabase.auth.signOut();
+            } catch(e) {}
+        }
+        localStorage.removeItem('usuarioAutenticado');
+        
+        const rememberedEmail = localStorage.getItem('lembrar_email');
+        const txtEmail = document.getElementById('txtEmail');
+        if (txtEmail) {
+            txtEmail.value = rememberedEmail || '';
+        }
+        const txtSenha = document.getElementById('txtSenha');
+        if (txtSenha) txtSenha.value = '';
+        
+        document.getElementById('txtNomeUsuario').value = '';
+        document.getElementById('txtEmailCadastro').value = '';
+        document.getElementById('txtNovaSenha').value = '';
+        document.getElementById('txtConfirmarSenha').value = '';
+        
+        document.getElementById('tela-dashboard').classList.add('hidden');
+        document.getElementById('tela-autenticacao').classList.remove('hidden');
+        
+        mostrarTelaLogin();
+        showToast('Sessão encerrada.', 'warning');
+        return;
+       document.getElementById('txtEmail').value = '';
+       document.getElementById('txtSenha').value = '';
+       document.getElementById('txtNomeUsuario').value = '';
+       document.getElementById('txtEmailCadastro').value = '';
+       document.getElementById('txtNovaSenha').value = '';
+       document.getElementById('txtConfirmarSenha').value = '';
+       
+       document.getElementById('tela-dashboard').classList.add('hidden');
+       document.getElementById('tela-autenticacao').classList.remove('hidden');
+       
+       mostrarTelaLogin();
+       showToast('Sessão encerrada.', 'warning');
+    }
+
+    function syncReferencia(val) {
+      document.getElementById('txtReferencia').value = val;
+      if(document.getElementById('iptReferenciaInterna')) {
+        document.getElementById('iptReferenciaInterna').value = val;
+      }
+      renderNotas();
+      renderAuditoria();
+    }
+
+    async function verificarAutenticacao() {
+        if (!supabase) return false;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session && session.user) {
+                const nome = session.user.user_metadata?.full_name || session.user.email || 'Operador';
+                logarUsuario(nome);
+                return true;
+            }
+        } catch (e) {
+            console.error("Erro ao verificar autenticação:", e);
+        }
+        
+        document.getElementById('tela-autenticacao').classList.remove('hidden');
+        document.getElementById('tela-dashboard').classList.add('hidden');
+        
+        const rememberedEmail = localStorage.getItem('lembrar_email');
+        const txtEmail = document.getElementById('txtEmail');
+        const chkLembrarEmail = document.getElementById('chkLembrarEmail');
+        if (rememberedEmail && txtEmail) {
+            txtEmail.value = rememberedEmail;
+            if (chkLembrarEmail) chkLembrarEmail.checked = true;
+        }
+        
+        return false;
+       if (salvo) {
+           try {
+               const user = JSON.parse(salvo);
+               if (user && user.nome) {
+                   logarUsuario(user.nome);
+                   return true;
+               }
+           } catch(e) {}
+       }
+       
+       // Not authenticated - display auth screen
+       document.getElementById('tela-autenticacao').classList.remove('hidden');
+       document.getElementById('tela-dashboard').classList.add('hidden');
+       return false;
+    }
+
+    // On Load
+    window.addEventListener('DOMContentLoaded', () => {
+      // Limpeza Absoluta de Mocks
+       localStorage.removeItem('usuarios');
+       localStorage.removeItem('cadastrosUsuarios');
+       localStorage.removeItem('usuarioAutenticado');
+
+       // Supabase Auth State Transition listener (Captures invite links)
+       if (supabase) {
+           supabase.auth.onAuthStateChange((event, session) => {
+               const hasInvite = window.location.href.includes('type=invite') || window.location.hash.includes('type=invite');
+               if (hasInvite || event === 'PASSWORD_RECOVERY') {
+                   mostrarTelaPrimeiroAcesso(true);
+                   if (session && session.user) {
+                       const txtEmailCadastro = document.getElementById('txtEmailCadastro');
+                       if (txtEmailCadastro) {
+                           txtEmailCadastro.value = session.user.email || '';
+                           txtEmailCadastro.disabled = true;
+                           txtEmailCadastro.classList.add('bg-slate-200', 'cursor-not-allowed');
+                       }
+                   }
+               }
+           });
+       }
+
+       // Setup Navigation Listeners (keyup & keydown) for Empresa and Condomínio Form fields
+       const setupFieldNavigation = (inputEl, nextAction) => {
+           if (!inputEl) return;
+           const handleKey = (e) => {
+               if (e.key === 'Enter') {
+                   e.preventDefault();
+                   if (typeof nextAction === 'string') {
+                       const nextEl = document.getElementById(nextAction);
+                       if (nextEl) nextEl.focus();
+                   } else if (typeof nextAction === 'function') {
+                       nextAction();
+                   }
+               }
+           };
+           inputEl.addEventListener('keydown', handleKey);
+           inputEl.addEventListener('keyup', handleKey);
+       };
+
+       setupFieldNavigation(document.getElementById('novaCnpjEmp'), 'novoNomeEmp');
+       setupFieldNavigation(document.getElementById('novoNomeEmp'), salvarNovaEmpresa);
+       setupFieldNavigation(document.getElementById('novaCodCond'), 'novoNomeCond');
+       setupFieldNavigation(document.getElementById('novoNomeCond'), salvarNovoCondominio);
+
+       // Do not auto-focus or auto-fill unless authenticated
+      const now = new Date();
+      const anoStr = now.getFullYear();
+      const mesStr = String(now.getMonth() + 1).padStart(2, '0');
+      document.getElementById('txtReferencia').value = `${anoStr}-${mesStr}`;
+      if (document.getElementById('iptReferenciaInterna')) {
+          document.getElementById('iptReferenciaInterna').value = `${anoStr}-${mesStr}`;
+      }
+
+      // Attach net value calculation listeners
+      [iptValorBruto, iptISS, iptINSS, iptIR].forEach(input => {
+         if (input) input.addEventListener('input', recalcularValorLiquido);
+      });
+      if (document.getElementById('chkPis')) {
+          document.getElementById('chkPis').addEventListener('change', () => {
+              setTimeout(recalcularValorLiquido, 50);
+          });
+      }
+      if (document.getElementById('iptPIS')) document.getElementById('iptPIS').addEventListener('input', recalcularValorLiquido);
+      if (document.getElementById('iptCOFINS')) document.getElementById('iptCOFINS').addEventListener('input', recalcularValorLiquido);
+      if (document.getElementById('iptCSLL')) document.getElementById('iptCSLL').addEventListener('input', recalcularValorLiquido);
+      if (document.getElementById('iptPisVal')) document.getElementById('iptPisVal').addEventListener('input', recalcularValorLiquido);
+
+      // Hotkey shortcut (Ctrl+Enter / Cmd+Enter) to submit "Lançar Nova Nota" form
+      document.addEventListener('keydown', function(event) {
+         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+             const tabLancar = document.getElementById('tab-lancar');
+             if (tabLancar && !tabLancar.classList.contains('hidden')) {
+                 const cond = document.getElementById('iptCondominio').value.trim();
+                 const cnpj = document.getElementById('iptCnpj').value.trim();
+                 const nota = document.getElementById('iptNota').value.trim();
+                 const dia = document.getElementById('iptDiaEmissao').value.trim();
+                 const bruto = parseFloat(document.getElementById('iptValorBruto').value) || 0;
+                 
+                 const iss = parseFloat(document.getElementById('iptISS').value) || 0;
+                 const inss = parseFloat(document.getElementById('iptINSS').value) || 0;
+                 const ir = parseFloat(document.getElementById('iptIR').value) || 0;
+                 const chkPis = document.getElementById('chkPis').checked;
+                 const pisVal = chkPis ? (parseFloat(document.getElementById('iptPisVal').value) || 0) : 0;
+                 
+                 const temEncargo = (iss > 0 || inss > 0 || ir > 0 || pisVal > 0);
+                 
+                 if (cond && cnpj && nota && dia && bruto > 0 && temEncargo) {
+                     event.preventDefault();
+                     enviarNota();
+                 } else {
+                     let missing = [];
+                     if (!cond) missing.push('Condomínio');
+                     if (!cnpj) missing.push('CNPJ');
+                     if (!nota) missing.push('Nº Nota');
+                     if (!dia) missing.push('Dia de Emissão');
+                     if (bruto <= 0) missing.push('Valor Bruto');
+                     if (!temEncargo) missing.push('Pelo menos 1 encargo (>0)');
+                     
+                     showToast(`Não é possível enviar via Ctrl+Enter. Faltam: ${missing.join(', ')}`, 'warning');
+                 }
+             }
+         }
+      });
+
+      // Perform auth session check
+       // Login and Registration keyboard action ("Enter" key triggers form submission)
+       const checkLoginEnter = (event) => {
+          if (event.key === 'Enter') {
+              event.preventDefault();
+              executarLogin();
+          }
+       };
+       const txtEmail = document.getElementById('txtEmail');
+       const txtSenha = document.getElementById('txtSenha');
+       if (txtEmail) txtEmail.addEventListener('keydown', checkLoginEnter);
+       if (txtSenha) txtSenha.addEventListener('keydown', checkLoginEnter);
+
+       const checkRegisterEnter = (event) => {
+          if (event.key === 'Enter') {
+              event.preventDefault();
+              executarCadastro();
+          }
+       };
+       ['txtNomeUsuario', 'txtEmailCadastro', 'txtNovaSenha', 'txtConfirmarSenha'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.addEventListener('keydown', checkRegisterEnter);
+       });
+
+       verificarAutenticacao();
+    });
+    // --- 8. FUNÇÕES DOS MODAIS ---
+    function salvarNovoCondominio() {
+        let cod = document.getElementById('novaCodCond').value.trim().toUpperCase();
+        let nome = titleCase(document.getElementById('novoNomeCond').value.trim());
+        
+        if (cod.length !== 3) { showToast('Código deve ter 3 dígitos.', 'error'); return; }
+        if (!nome) { showToast('Nome é obrigatório.', 'error'); return; }
+        
+        if (dbCondominios.some(c => c.codigo === cod)) {
+            showToast('Código já cadastrado.', 'error');
+            return;
+        }
+
+        (async () => {
+             try {
+                 const { error } = await supabase.from('condominios').insert([{ codigo: cod, razao_social: nome }]);
+                 if (error) {
+                     showToast('Erro ao gravar: ' + error.message, 'error');
+                     return;
+                 }
+                 let oper = getOperador();
+                 await supabase.from('logs_auditoria').insert([{
+                     operador: oper,
+                     acao: 'ADD_CONDOMINIO',
+                     entidade: cod,
+                     recurso: nome,
+                     descricao: `Novo condomínio adicionado manualmente`,
+                     referencia: document.getElementById('txtReferencia').value
+                 }]);
+                 showToast('Condomínio adicionado com sucesso.', 'success');
+                 document.getElementById('modalNovoCond').classList.add('hidden');
+                 document.getElementById('novaCodCond').value = '';
+                 document.getElementById('novoNomeCond').value = '';
+                 renderCondominios();
+             } catch(e) { 
+                 console.error(e);
+                 showToast('Erro ao criar condomínio.', 'error');
+             }
+        })();
+    }
+
+    function processarLoteCondominio() {
+        let txt = document.getElementById('txtLoteCond').value.trim();
+        if (!txt) return;
+
+        let linhas = txt.split('\n');
+        let itemsToUpsert = [];
+        let inseridos = 0;
+        let atualizados = 0;
+
+        linhas.forEach(linha => {
+            let partes = linha.split('\t'); // Split by TAB (padrão de cola do excel)
+            if (partes.length >= 2) {
+                let cod = partes[0].trim().toUpperCase();
+                let nome = titleCase(partes[1].trim());
+                if (cod.length === 3 && nome) {
+                    let existente = dbCondominios.find(c => c.codigo === cod);
+                    if (existente) {
+                        atualizados++;
+                    } else {
+                        inseridos++;
+                    }
+                    itemsToUpsert.push({ codigo: cod, razao_social: nome });
+                }
+            }
+        });
+
+        if (itemsToUpsert.length === 0) {
+            showToast('Nenhum condomínio válido encontrado no texto.', 'warning');
+            return;
+        }
+
+        (async () => {
+            try {
+                const { error } = await supabase.from('condominios').upsert(itemsToUpsert);
+                if (error) {
+                    showToast('Erro ao importar lote: ' + error.message, 'error');
+                    return;
+                }
+                let oper = getOperador();
+                await supabase.from('logs_auditoria').insert([{
+                    operador: oper,
+                    acao: 'BATCH_CONDOMINIO',
+                    entidade: `${itemsToUpsert.length} Condomínios`,
+                    recurso: '',
+                    descricao: `Importação em lote de ${itemsToUpsert.length} condomínios`,
+                    referencia: document.getElementById('txtReferencia').value
+                }]);
+
+                showToast(`Lote processado: ${inseridos} inseridos, ${atualizados} atualizados.`, 'success');
+                document.getElementById('modalLoteCond').classList.add('hidden');
+                document.getElementById('txtLoteCond').value = '';
+                renderCondominios();
+            } catch(e) {
+                console.error(e);
+                showToast('Erro ao processar lote no banco de dados.', 'error');
+            }
+        })();
+    }
+
+    function salvarNovaEmpresa() {
+        let cnpjInput = document.getElementById('novaCnpjEmp').value.trim();
+        let cnpjLimpo = cnpjInput.replace(/[^\d]+/g, '');
+        let nome = titleCase(document.getElementById('novoNomeEmp').value.trim());
+        
+        if (!validarCNPJ(cnpjInput)) { showToast('CNPJ inválido.', 'error'); return; }
+        if (!nome) { showToast('Razão Social é obrigatória.', 'error'); return; }
+        
+        if (dbEmpresas.some(e => e.cnpj === cnpjLimpo)) {
+            showToast('CNPJ já cadastrado.', 'error');
+            return;
+        }
+
+        (async () => {
+             try {
+                 const { error } = await supabase.from('empresas').insert([{ cnpj: cnpjLimpo, razao_social: nome }]);
+                 if (error) {
+                     showToast('Erro ao gravar: ' + error.message, 'error');
+                     return;
+                 }
+                 let oper = getOperador();
+                 await supabase.from('logs_auditoria').insert([{
+                     operador: oper,
+                     acao: 'ADD_EMPRESA',
+                     entidade: cnpjLimpo,
+                     recurso: nome,
+                     descricao: `Nova empresa cadastrada manualmente`,
+                     referencia: document.getElementById('txtReferencia').value
+                 }]);
+                 showToast('Empresa adicionada com sucesso.', 'success');
+                 document.getElementById('modalNovaEmp').classList.add('hidden');
+                 document.getElementById('novaCnpjEmp').value = '';
+                 document.getElementById('novoNomeEmp').value = '';
+                 renderEmpresas();
+             } catch(e) { 
+                 console.error(e);
+                 showToast('Erro ao criar empresa.', 'error');
+             }
+        })();
+    }
+
+    function processarLoteEmpresa() {
+        let txt = document.getElementById('txtLoteEmp').value.trim();
+        if (!txt) return;
+
+        let linhas = txt.split('\n');
+        let itemsToUpsert = [];
+        let inseridos = 0;
+        let atualizados = 0;
+
+        linhas.forEach(linha => {
+            let partes = inline_tab_or_split_or_more = linha.split('\t'); // Split by TAB (padrão de cola do excel)
+            if (partes.length >= 2) {
+                let cnpjLimpo = partes[0].replace(/[^\d]+/g, '');
+                let nome = titleCase(partes[1].trim());
+                
+                if (cnpjLimpo && nome) {
+                    let existente = dbEmpresas.find(e => e.cnpj === cnpjLimpo);
+                    if (existente) {
+                        atualizados++;
+                    } else {
+                        inseridos++;
+                    }
+                    itemsToUpsert.push({ cnpj: cnpjLimpo, razao_social: nome });
+                }
+            }
+        });
+
+        if (itemsToUpsert.length === 0) {
+            showToast('Nenhuma empresa válida encontrada no texto.', 'warning');
+            return;
+        }
+
+        (async () => {
+            try {
+                const { error } = await supabase.from('empresas').upsert(itemsToUpsert);
+                if (error) {
+                    showToast('Erro ao importar lote: ' + error.message, 'error');
+                    return;
+                }
+                let oper = getOperador();
+                await supabase.from('logs_auditoria').insert([{
+                    operador: oper,
+                    acao: 'BATCH_EMPRESA',
+                    entidade: `${itemsToUpsert.length} Empresas`,
+                    recurso: '',
+                    descricao: `Importação em lote de ${itemsToUpsert.length} empresas`,
+                    referencia: document.getElementById('txtReferencia').value
+                }]);
+
+                showToast(`Lote processado: ${inseridos} inseridos, ${atualizados} atualizados.`, 'success');
+                document.getElementById('modalLoteEmp').classList.add('hidden');
+                document.getElementById('txtLoteEmp').value = '';
+                renderEmpresas();
+            } catch(e) {
+                console.error(e);
+                showToast('Erro ao processar lote no banco de dados.', 'error');
+            }
+        })();
+    }
+
+    document.getElementById('novaCnpjEmp').addEventListener('input', function() {
+        this.value = mascararCNPJ(this.value);
+    });
+  </script>
+</body>
+</html>

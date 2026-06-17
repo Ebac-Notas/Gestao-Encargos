@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Notas Fiscais",
+  "description": "Sistema estilo desktop para lançamento e gestão de notas fiscais com formulários flutuantes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
