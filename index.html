@@ -928,6 +928,84 @@
         }
     }
 
+    let realtimeInicializado = false;
+    function inicializarRealtime() {
+        if (!supabase) return;
+        if (realtimeInicializado) {
+            console.log("Inscrição em tempo real já ativa.");
+            return;
+        }
+
+        console.log("Inicializando inscrições em tempo real (Supabase Realtime)...");
+        
+        try {
+            // Nota Fiscal Channel Subscription
+            const canalNotas = supabase
+                .channel('realtime_notas')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'notas_fiscais' },
+                    async (payload) => {
+                        console.log('Alteração em tempo real [notas_fiscais]:', payload);
+                        await renderNotas(true);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Status canal notas:', status);
+                });
+
+            // Empresas (Fornecedores) Channel Subscription
+            const canalEmpresas = supabase
+                .channel('realtime_empresas')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'empresas' },
+                    async (payload) => {
+                        console.log('Alteração em tempo real [empresas]:', payload);
+                        await renderEmpresas(true);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Status canal empresas:', status);
+                });
+
+            // Condomínios Channel Subscription
+            const canalCondominios = supabase
+                .channel('realtime_condominios')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'condominios' },
+                    async (payload) => {
+                        console.log('Alteração em tempo real [condominios]:', payload);
+                        await renderCondominios(true);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Status canal condominios:', status);
+                });
+
+            // Auditoria (Logs) Channel Subscription
+            const canalAuditoria = supabase
+                .channel('realtime_auditoria')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'logs_auditoria' },
+                    async (payload) => {
+                        console.log('Alteração em tempo real [logs_auditoria]:', payload);
+                        await renderAuditoria(true);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Status canal auditoria:', status);
+                });
+
+            realtimeInicializado = true;
+            console.log("Inscrições em tempo real ativadas com sucesso!");
+        } catch (error) {
+            console.error("Falha ao configurar Supabase Realtime:", error);
+        }
+    }
+
     // --- 2. UTLITY FUNCTIONS ---
     function formatMoney(num) {
       return Number(num).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -2594,6 +2672,7 @@
        
        // Default Tab
        alterarAba('tab-notas');
+       inicializarRealtime();
     }
 
     async function executarLogin() {
