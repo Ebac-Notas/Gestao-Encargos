@@ -2096,7 +2096,9 @@
                 iss: Number(n.iss),
                 inss: Number(n.inss),
                 ir: Number(n.ir),
-                pisDigitado: Number(n.pis_digitado),
+                pisDigitado: (n.pis_digitado !== null && Number(n.pis_digitado) > 0)
+                  ? Number(n.pis_digitado)
+                  : (Number(n.val_pis || 0) + Number(n.val_cofins || 0) + Number(n.val_csll || 0)),
                 valPIS: Number(n.val_pis),
                 valCOFINS: Number(n.val_cofins),
                 valCSLL: Number(n.val_csll),
