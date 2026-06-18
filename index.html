@@ -3360,6 +3360,7 @@
         const fltINSS = document.getElementById("fltINSS").checked;
         const fltIR = document.getElementById("fltIR").checked;
         const fltPIS = document.getElementById("fltPIS").checked;
+        const fltOutro = document.getElementById("fltOutroMunicipio") ? document.getElementById("fltOutroMunicipio").checked : false;
 
         if (fltISS || fltINSS || fltIR || fltPIS) {
           filtradas = filtradas.filter((n) => {
@@ -3369,6 +3370,10 @@
             if (fltPIS && n.pisDigitado > 0) return true;
             return false;
           });
+        }
+
+        if (fltOutro) {
+          filtradas = filtradas.filter((n) => n.outroMunicipio === true);
         }
 
         // Sorting
@@ -3416,7 +3421,11 @@
               <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det hidden editable-cell" data-prop="valCOFINS">${formatMoney(n.valCOFINS || 0)}</td>
               <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det hidden editable-cell" data-prop="valCSLL">${formatMoney(n.valCSLL || 0)}</td>
               <td class="p-2 text-center font-mono border-r border-slate-200 editable-cell" data-prop="codServico">${n.outroMunicipio ? (n.codServico || "-") : "-"}</td>
-              <td class="p-2 text-center border-r border-slate-200 editable-cell font-bold text-slate-700 font-mono" data-prop="statusServico">${n.outroMunicipio ? (n.statusServico || "Pendente") : "-"}</td>
+              <td class="p-2 text-center border-r border-slate-200 editable-cell font-bold text-slate-700 font-mono" data-prop="statusServico">
+                ${n.outroMunicipio 
+                  ? `<button type="button" onclick="toggleStatusServicoClick(event, '${uniqueId}')" class="status-btn px-2.5 py-1 text-[11px] font-extrabold uppercase rounded cursor-pointer transition-all hover:scale-105 shadow-sm inline-flex items-center gap-1 ${(n.statusServico || 'Pendente').toUpperCase() === 'OK' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}"><span class="w-1.5 h-1.5 rounded-full ${(n.statusServico || 'Pendente').toUpperCase() === 'OK' ? 'bg-emerald-500' : 'bg-amber-500'}"></span><span class="status-text">${n.statusServico || 'Pendente'}</span></button>` 
+                  : "-"}
+              </td>
               <td class="p-2 text-center border-r border-slate-200"><span class="bg-blue-100 px-2 py-0.5 rounded text-[10px] font-black text-blue-800 align-middle">${n.operador}</span></td>
               <td class="p-2 text-center">
                  <button onclick="handleAcaoRow('notas', '${uniqueId}', this)" class="btn-acao p-1 rounded text-red-600 hover:bg-red-50 focus:outline-none transition-colors" title="Excluir">
@@ -3763,6 +3772,90 @@
         }
       }
 
+      async function toggleStatusServicoClick(e, uniqueId) {
+        if (e) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+
+        let nota = dbNotas.find((n) => n.cnpj + "|" + n.numNota === uniqueId);
+        if (!nota || !nota.outroMunicipio) return;
+
+        let currentStatus = (nota.statusServico || "Pendente").trim().toUpperCase();
+        let newStatus = currentStatus === "OK" ? "Pendente" : "OK";
+
+        // Let's find the tr element to see if the row is currently being edited
+        let btn = e ? e.currentTarget : null;
+        if (!btn) return;
+        let tr = btn.closest("tr");
+        let actionsBtn = tr ? tr.querySelector(".btn-acao") : null;
+        let isEditing = actionsBtn && actionsBtn.dataset.editing === "true";
+
+        if (isEditing) {
+          // If editing is active, just update local note model and UI display,
+          // so it saves inline when the user clicks the "Save" disk icon.
+          nota.statusServico = newStatus;
+          
+          let statusTextEl = btn.querySelector(".status-text");
+          let dotEl = btn.querySelector("span:first-child");
+          
+          if (newStatus === "OK") {
+            if (statusTextEl) statusTextEl.innerText = "OK";
+            btn.className = "status-btn px-2.5 py-1 text-[11px] font-extrabold uppercase rounded cursor-pointer transition-all hover:scale-105 shadow-sm inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300";
+            if (dotEl) dotEl.className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+          } else {
+            if (statusTextEl) statusTextEl.innerText = "Pendente";
+            btn.className = "status-btn px-2.5 py-1 text-[11px] font-extrabold uppercase rounded cursor-pointer transition-all hover:scale-105 shadow-sm inline-flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300";
+            if (dotEl) dotEl.className = "w-1.5 h-1.5 rounded-full bg-amber-500";
+          }
+          showToast(`Status alterado para ${newStatus}. Salve a linha para confirmar no banco.`, "info");
+        } else {
+          // If NOT in edit mode, toggle and SAVE IMMEDIATELY with 1 click!
+          nota.statusServico = newStatus;
+          let oper = getOperador();
+          let refSelecionada = document.getElementById("txtReferencia").value;
+
+          try {
+            dbAuditoria.unshift({
+              dataHora: formatDateTime(new Date()),
+              operador: oper,
+              acao: "UPDATE_STATUS",
+              entidade: nota.codCond,
+              recurso: nota.cnpj,
+              descricao: `Alteração de status de serviço para [${newStatus}] na NF [${nota.numNota}]`,
+              referencia: refSelecionada,
+              numNota: nota.numNota,
+            });
+
+            await supabase
+              .from("notas_fiscais")
+              .update({
+                status_servico: newStatus,
+              })
+              .eq("id", nota.id);
+
+            await supabase.from("logs_auditoria").insert([
+              {
+                operador: oper,
+                acao: "UPDATE_STATUS",
+                entidade: nota.codCond,
+                recurso: nota.cnpj,
+                descricao: `Alteração de status de serviço para [${newStatus}] na NF [${nota.numNota}]`,
+                referencia: refSelecionada,
+                num_nota: nota.numNota,
+              },
+            ]);
+
+            showToast(`Status atualizado para ${newStatus}!`, "success");
+            renderNotas(false);
+            renderAuditoria();
+          } catch (err) {
+            console.error(err);
+            showToast("Erro ao salvar alteração de status.", "error");
+          }
+        }
+      }
+
       function startEditRow(gridName, id, trEl, event) {
         if (currentRowInEdit && currentRowInEdit !== trEl) {
           endEditRow(currentRowInEdit);
@@ -3779,6 +3872,10 @@
 
         let tds = trEl.querySelectorAll(".editable-cell");
         tds.forEach((td) => {
+          if (td.dataset.prop === "statusServico") {
+            // Service status is interactive using the 1-click badge button, not typed.
+            return;
+          }
           td.contentEditable = "true";
           td.classList.add(
             "bg-yellow-50",
