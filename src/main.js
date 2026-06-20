@@ -994,6 +994,12 @@ export function startEditRow(gridName, id, trEl, event) {
         this.innerText = this.innerText.replace(/^0+/, "") || "0";
       });
     }
+
+    if (td.dataset.prop === "nome") {
+      td.addEventListener("blur", function () {
+        this.innerText = titleCase(this.innerText.trim());
+      });
+    }
   });
 
   showToast("Modo de edição ativo. Altere a célula e clique fora para salvar.", "info");
@@ -1059,22 +1065,33 @@ export function handleAcaoRow(gridName, id, btnObj) {
         props[td.dataset.prop] = td.innerText;
       });
 
-      let oBruto = parseMoney(props.valor);
-      let oIss = parseMoney(props.iss);
-      let oInss = parseMoney(props.inss);
-      let oIr = parseMoney(props.ir);
-      let oPIS = parseMoney(props.valPIS);
-      let oCOFINS = parseMoney(props.valCOFINS);
-      let oCSLL = parseMoney(props.valCSLL);
-      let oPISDigitado = parseMoney(props.pisDigitado);
+      let oBruto = 0;
+      let oIss = 0;
+      let oInss = 0;
+      let oIr = 0;
+      let oPIS = 0;
+      let oCOFINS = 0;
+      let oCSLL = 0;
+      let oPISDigitado = 0;
 
-      if (oBruto <= 0) {
-        showToast("Valor Bruto editado inválido.", "error");
-        return;
-      }
-      if (oIss > oBruto * 0.1) {
-        showToast("ISS não pode exceder 10% do Valor Bruto.", "error");
-        return;
+      if (gridName === "notas") {
+        oBruto = parseMoney(props.valor);
+        oIss = parseMoney(props.iss);
+        oInss = parseMoney(props.inss);
+        oIr = parseMoney(props.ir);
+        oPIS = parseMoney(props.valPIS);
+        oCOFINS = parseMoney(props.valCOFINS);
+        oCSLL = parseMoney(props.valCSLL);
+        oPISDigitado = parseMoney(props.pisDigitado);
+
+        if (oBruto <= 0) {
+          showToast("Valor Bruto editado inválido.", "error");
+          return;
+        }
+        if (oIss > oBruto * 0.1) {
+          showToast("ISS não pode exceder 10% do Valor Bruto.", "error");
+          return;
+        }
       }
 
       (async () => {
@@ -1768,6 +1785,16 @@ window.addEventListener("DOMContentLoaded", () => {
   setupFieldNavigation(getEl("novoNomeEmp"), salvarNovaEmpresa);
   setupFieldNavigation(getEl("novaCodCond"), "novoNomeCond");
   setupFieldNavigation(getEl("novoNomeCond"), salvarNovoCondominio);
+
+  // Auto capitalize first letters (Title Case) on blur
+  ["novoNomeEmp", "novoNomeCond", "iptRazaoSocial", "txtNomeUsuario"].forEach((id) => {
+    const el = getEl(id);
+    if (el) {
+      el.addEventListener("blur", function () {
+        this.value = titleCase(this.value.trim());
+      });
+    }
+  });
 
   const now = new Date();
   const anoStr = now.getFullYear();
