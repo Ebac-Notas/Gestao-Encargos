@@ -190,7 +190,7 @@ export async function enviarNota() {
   }
 
   if (!requireField(iptCnpj.value, "CNPJ Emissor")) return;
-  let rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "");
+  let rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "").padStart(14, "0");
 
   if (!requireField(iptRazaoSocial.value, "Razão Social da Empresa")) return;
   if (!requireField(iptNota.value, "Nº da Nota")) return;
@@ -1206,7 +1206,7 @@ export function handleAcaoRow(gridName, id, btnObj) {
               showToast("Nota editada e salva com sucesso!", "success");
             }
           } else if (gridName === "empresas") {
-            let cleanNewCnpj = String(props.cnpj || "").replace(/[^\d]+/g, "");
+            let cleanNewCnpj = String(props.cnpj || "").replace(/[^\d]+/g, "").padStart(14, "0");
             if (!validarCNPJ(props.cnpj)) {
               showToast("CNPJ inválido.", "error");
               return;
@@ -1508,7 +1508,7 @@ window.processarLoteCondominio = processarLoteCondominio;
 
 export function salvarNovaEmpresa() {
   let cnpjInput = getEl("novaCnpjEmp").value.trim();
-  let cnpjLimpo = cnpjInput.replace(/[^\d]+/g, "");
+  let cnpjLimpo = cnpjInput.replace(/[^\d]+/g, "").padStart(14, "0");
   let nome = titleCase(getEl("novoNomeEmp").value.trim());
 
   if (!validarCNPJ(cnpjInput)) {
@@ -1570,7 +1570,7 @@ export function processarLoteEmpresa() {
   linhas.forEach((linha) => {
     let partes = linha.split("\t");
     if (partes.length >= 2) {
-      let cnpjLimpo = partes[0].replace(/[^\d]+/g, "");
+      let cnpjLimpo = partes[0].replace(/[^\d]+/g, "").padStart(14, "0");
       let nome = titleCase(partes[1].trim());
 
       if (cnpjLimpo && nome) {
@@ -2005,7 +2005,7 @@ window.addEventListener("DOMContentLoaded", () => {
           this.value = "";
           lblCondHeader.innerText = "CÓDIGO INEXISTENTE";
           lblCondHeader.className = "text-xl font-black text-red-600 uppercase tracking-wide";
-          setTimeout(() => this.focus(), 10);
+          setTimeout(() => iptCondominio.focus(), 10);
         }
       } catch (e) {
         console.error(e);
@@ -2281,13 +2281,13 @@ window.addEventListener("DOMContentLoaded", () => {
           getEl("boxNovaEmpresa").classList.remove("flex");
           return;
         }
-        if (!validarCNPJ(this.value)) {
+        if (!validarCNPJ(iptCnpj.value)) {
           showToast("CNPJ inválido!", "error");
-          this.value = "";
+          iptCnpj.value = "";
           iptRazaoSocial.value = "";
           getEl("boxNovaEmpresa").classList.add("hidden");
           getEl("boxNovaEmpresa").classList.remove("flex");
-          setTimeout(() => this.focus(), 10);
+          setTimeout(() => iptCnpj.focus(), 10);
           return;
         }
 

@@ -18,6 +18,10 @@ export function formatMoney(val) {
 
 export function mascararCNPJ(cnpj) {
   let val = String(cnpj).replace(/\D/g, "");
+  if (val === "") return "";
+  if (val.length === 12 || val.length === 13) {
+    val = val.padStart(14, "0");
+  }
   if (val.length > 14) val = val.substring(0, 14);
   return val
     .replace(/^(\d{2})(\d)/, "$1.$2")
@@ -47,6 +51,9 @@ export function titleCase(str) {
 export function validarCNPJ(cnpj) {
   cnpj = String(cnpj).replace(/[^\d]+/g, "");
   if (cnpj === "") return false;
+  if (cnpj.length < 14) {
+    cnpj = cnpj.padStart(14, "0");
+  }
   if (cnpj.length !== 14) return false;
   if (/^(\d)\1{13}$/.test(cnpj)) return false;
 
