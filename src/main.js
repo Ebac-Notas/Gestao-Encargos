@@ -2063,10 +2063,32 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!el) return;
 
     el.addEventListener("keydown", function (e) {
+      if (el.id === "iptCnpj") {
+        const listaCnpj = getEl("listaCnpj");
+        if (listaCnpj && !listaCnpj.classList.contains("hidden") && listaCnpj.children.length > 0) {
+          if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowDown" || e.key === "ArrowUp") {
+            return;
+          }
+        }
+      }
+      if (el.id === "iptRazaoSocial") {
+        const listaNome = getEl("listaNome");
+        if (listaNome && !listaNome.classList.contains("hidden") && listaNome.children.length > 0) {
+          if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowDown" || e.key === "ArrowUp") {
+            return;
+          }
+        }
+      }
+
       if (el.id === "iptCnpj" && (e.key === "Tab" || e.key === "Enter")) {
         let raw = el.value.replace(/[^\d]+/g, "");
         if (raw) {
           e.preventDefault();
+
+          if (raw.length === 12 || raw.length === 13) {
+            raw = raw.padStart(14, "0");
+            el.value = mascararCNPJ(raw);
+          }
 
           if (!validarCNPJ(el.value)) {
             showToast("CNPJ inválido!", "error");
@@ -2281,6 +2303,12 @@ window.addEventListener("DOMContentLoaded", () => {
           getEl("boxNovaEmpresa").classList.remove("flex");
           return;
         }
+
+        if (raw.length === 12 || raw.length === 13) {
+          raw = raw.padStart(14, "0");
+          iptCnpj.value = mascararCNPJ(raw);
+        }
+
         if (!validarCNPJ(iptCnpj.value)) {
           showToast("CNPJ inválido!", "error");
           iptCnpj.value = "";

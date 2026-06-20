@@ -46,13 +46,26 @@ export function titleCase(str) {
 }
 
 export function validarCNPJ(cnpj) {
+  const originalInput = cnpj;
   cnpj = String(cnpj).replace(/[^\d]+/g, "");
-  if (cnpj === "") return false;
-  if (cnpj.length < 14) {
-    cnpj = cnpj.padStart(14, "0");
+  console.log(`[CNPJ Debug] original: "${originalInput}" -> cleaned: "${cnpj}"`);
+  if (cnpj === "") {
+    console.warn(`[CNPJ Debug] Cleaner resulted in empty string.`);
+    return false;
   }
-  if (cnpj.length !== 14) return false;
-  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+  if (cnpj.length < 14) {
+    const padded = cnpj.padStart(14, "0");
+    console.log(`[CNPJ Debug] Padding string from ${cnpj.length} to 14 chars -> "${padded}"`);
+    cnpj = padded;
+  }
+  if (cnpj.length !== 14) {
+    console.warn(`[CNPJ Debug] CNPJ length ${cnpj.length} is not 14 digits.`);
+    return false;
+  }
+  if (/^(\d)\1{13}$/.test(cnpj)) {
+    console.warn(`[CNPJ Debug] CNPJ consists of repeated digits: "${cnpj}".`);
+    return false;
+  }
 
   let tamanho = cnpj.length - 2;
   let numeros = cnpj.substring(0, tamanho);
@@ -64,7 +77,10 @@ export function validarCNPJ(cnpj) {
     if (pos < 2) pos = 9;
   }
   let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-  if (resultado !== parseInt(digitos.charAt(0))) return false;
+  if (resultado !== parseInt(digitos.charAt(0))) {
+    console.warn(`[CNPJ Debug] First check digit mismatch: calculated ${resultado}, got ${digitos.charAt(0)}.`);
+    return false;
+  }
 
   tamanho = tamanho + 1;
   numeros = cnpj.substring(0, tamanho);
@@ -75,8 +91,12 @@ export function validarCNPJ(cnpj) {
     if (pos < 2) pos = 9;
   }
   resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-  if (resultado !== parseInt(digitos.charAt(1))) return false;
+  if (resultado !== parseInt(digitos.charAt(1))) {
+    console.warn(`[CNPJ Debug] Second check digit mismatch: calculated ${resultado}, got ${digitos.charAt(1)}.`);
+    return false;
+  }
 
+  console.log(`[CNPJ Debug] "${originalInput}" is a VALID CNPJ!`);
   return true;
 }
 
