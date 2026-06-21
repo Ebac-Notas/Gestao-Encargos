@@ -154,6 +154,17 @@
           </h1>
         </div>
         <div class="flex items-center gap-4">
+          <!-- Botão Conferir Notas (exibido apenas no Modo Conferência) -->
+          <button
+            type="button"
+            id="btnConferirNotasLote"
+            onclick="conferirNotasLote()"
+            class="hidden px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] uppercase rounded border border-emerald-500 transition-all focus:outline-none flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer animate-pulse"
+            title="Salvar status de conferência das notas na tabela"
+          >
+            <span class="material-symbols-outlined text-[15px]">done_all</span>
+            <span>Conferir Notas</span>
+          </button>
           <div
             class="flex items-center gap-2 mr-4 cursor-pointer full-click-picker"
             onclick="
@@ -391,6 +402,17 @@
                   />
                   Outros Municípios</label
                 >
+                <label
+                  class="flex items-center gap-1 cursor-pointer text-indigo-700 hover:text-indigo-900 font-extrabold border-l border-slate-200 pl-3 uppercase select-none"
+                  title="Filtrar por Notas a Conferir"
+                  ><input
+                    type="checkbox"
+                    class="flt-encargo rounded text-indigo-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
+                    id="fltAConferir"
+                    onchange="renderNotas(false)"
+                  />
+                  À Conferir</label
+                >
               </div>
 
               <!-- Borda/Parentesco Direita (Clicável para fechar ao expandir) -->
@@ -431,6 +453,18 @@
             >
               <thead class="sticky top-0 z-10 shadow-sm select-none">
                 <tr>
+                  <th
+                    id="th-conferir"
+                    class="p-2 w-10 text-center border-b-2 border-b-slate-400 bg-slate-200"
+                    style="display: none;"
+                  >
+                    <input
+                      type="checkbox"
+                      id="chk-selecionar-todas"
+                      class="rounded text-emerald-500 border-slate-300 focus:ring-0 cursor-pointer"
+                      onclick="window.selecionarTodasNotas(this.checked)"
+                    />
+                  </th>
                   <th
                     class="p-2 w-16 text-center border-b-2 border-b-slate-400 cursor-pointer hover:bg-slate-300"
                     onclick="sortGrid('notes', 'codCond')"

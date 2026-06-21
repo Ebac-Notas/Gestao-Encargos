@@ -100,6 +100,25 @@ export function validarCNPJ(cnpj) {
   return true;
 }
 
+export async function atualizarStatusConferida(idNota, status) {
+  if (!supabase) return false;
+  try {
+    const { data, error } = await supabase
+      .from("notas_fiscais")
+      .update({ conferida: !!status })
+      .eq("id", idNota);
+
+    if (error) {
+      console.error("Erro ao atualizar status de conferência no Supabase:", error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("Erro na chamada de atualizarStatusConferida:", e);
+    return false;
+  }
+}
+
 export function recalcularValorLiquido() {
   const brutoEl = document.getElementById("iptValorBruto");
   const issEl = document.getElementById("iptISS");

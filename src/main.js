@@ -9,7 +9,8 @@ import {
   calcularPisCofins, 
   ativarEdicaoPccManual, 
   atualizarSomaPcc, 
-  carregarSmartDefaults 
+  carregarSmartDefaults,
+  atualizarStatusConferida
 } from "./calculosImpostos.js";
 import { 
   formatDateTime, 
@@ -34,6 +35,7 @@ window.dbNotas = [];
 window.notasDoMes = [];
 window.dbAuditoria = [];
 window.modoConferencia = false;
+window.isBatchUpdating = false;
 window.sortState = {
   notas: { col: "", asc: true },
   empresas: { col: "", asc: true },
@@ -56,6 +58,7 @@ window.calcularPisCofins = calcularPisCofins;
 window.ativarEdicaoPccManual = ativarEdicaoPccManual;
 window.atualizarSomaPcc = atualizarSomaPcc;
 window.carregarSmartDefaults = carregarSmartDefaults;
+window.atualizarStatusConferida = atualizarStatusConferida;
 
 // --- EXPOSE INTERFACE MODULE TO GLOBAL WINDOW ---
 window.formatDateTime = formatDateTime;
@@ -91,14 +94,14 @@ export function toggleFiltroInterativo(forceState) {
   if (nextExpanded) {
     cnt.classList.add("expanded");
     cnt.classList.remove("w-28", "px-4", "justify-center", "cursor-pointer", "hover:bg-slate-50", "hover:border-slate-400");
-    cnt.classList.add("w-[660px]", "px-10", "bg-white", "border-slate-400");
+    cnt.classList.add("w-[820px]", "px-10", "bg-white", "border-slate-400");
 
     if (btnCloseLeft) btnCloseLeft.classList.remove("hidden");
     if (btnCloseRight) btnCloseRight.classList.remove("hidden");
 
     if (content) {
       content.classList.remove("opacity-0", "max-w-0", "pointer-events-none");
-      content.classList.add("opacity-100", "max-w-[500px]");
+      content.classList.add("opacity-100", "max-w-[660px]");
     }
     
     if (btnTrigger) {
@@ -106,7 +109,7 @@ export function toggleFiltroInterativo(forceState) {
     }
   } else {
     cnt.classList.remove("expanded");
-    cnt.classList.remove("w-[660px]", "px-10", "border-slate-400");
+    cnt.classList.remove("w-[820px]", "px-10", "border-slate-400");
     cnt.classList.add("w-28", "px-4", "justify-center", "cursor-pointer", "hover:bg-slate-50", "hover:border-slate-400");
 
     if (btnCloseLeft) btnCloseLeft.classList.add("hidden");
@@ -114,7 +117,7 @@ export function toggleFiltroInterativo(forceState) {
 
     if (content) {
       content.classList.add("opacity-0", "max-w-0", "pointer-events-none");
-      content.classList.remove("opacity-100", "max-w-[500px]");
+      content.classList.remove("opacity-100", "max-w-[660px]");
     }
 
     if (btnTrigger) {
@@ -1828,6 +1831,10 @@ export function inicializarRealtime() {
       .channel("realtime_notas")
       .on("postgres_changes", { event: "*", schema: "public", table: "notas_fiscais" }, async (payload) => {
         console.log("Alteração em tempo real [notas_fiscais]:", payload);
+        if (window.isBatchUpdating) {
+          console.log("Ignorando evento em tempo real de notas devido a atualização em lote.");
+          return;
+        }
         await renderNotas(true);
       })
       .subscribe((status) => {
@@ -1858,6 +1865,10 @@ export function inicializarRealtime() {
       .channel("realtime_auditoria")
       .on("postgres_changes", { event: "*", schema: "public", table: "logs_auditoria" }, async (payload) => {
         console.log("Alteração em tempo real [logs_auditoria]:", payload);
+        if (window.isBatchUpdating) {
+          console.log("Ignorando evento em tempo real de auditoria devido a atualização em lote.");
+          return;
+        }
         await renderAuditoria(true);
       })
       .subscribe((status) => {
@@ -2779,3 +2790,96 @@ window.addEventListener("DOMContentLoaded", () => {
   carregarPreferenciaTamanhoFonte();
   verificarAutenticacao();
 });
+
+export function selecionarTodasNotas(checked) {
+  const checkboxes = document.querySelectorAll(".chk-conferir");
+  checkboxes.forEach((cb) => {
+    cb.checked = checked;
+  });
+}
+window.selecionarTodasNotas = selecionarTodasNotas;
+
+export async function conferirNotasLote() {
+  const checkboxes = Array.from(document.querySelectorAll(".chk-conferir"));
+  const checkedBoxes = checkboxes.filter((cb) => cb.checked);
+  
+  if (checkedBoxes.length === 0) {
+    showToast("Nenhuma nota selecionada. Marque os checkboxes das notas que deseja alterar.", "warning");
+    return;
+  }
+
+  showToast("Processando alterações...", "info");
+  window.isBatchUpdating = true;
+
+  const promessas = [];
+  
+  checkedBoxes.forEach((cb) => {
+    const idNota = cb.getAttribute("data-id");
+    
+    // Find matching note in our local cache to determine current status
+    const notaDb = window.dbNotas.find(n => String(n.id) === String(idNota));
+    const currentStatus = notaDb ? !!notaDb.conferida : false;
+    // Toggle (reverse) the status!
+    const newStatus = !currentStatus;
+
+    // Immediate visual styling feedback
+    const tr = cb.closest("tr");
+    if (tr) {
+      if (newStatus) {
+        tr.className = "hover:bg-green-200 transition-colors cursor-pointer bg-green-100";
+        tr.style.backgroundColor = "#d1fae5"; // Beautiful soft-mid green, darker than before
+      } else {
+        tr.className = "hover:bg-blue-50 transition-colors cursor-pointer bg-white";
+        tr.style.backgroundColor = "";
+      }
+    }
+
+    // Update state objects instantly in memory
+    const notaMem = window.notasDoMes.find(n => String(n.id) === String(idNota));
+    if (notaMem) {
+      notaMem.conferida = newStatus;
+    }
+    if (notaDb) {
+      notaDb.conferida = newStatus;
+    }
+
+    // Call Supabase update operation
+    promessas.push(
+      atualizarStatusConferida(idNota, newStatus).then((success) => {
+        if (!success) {
+          console.error(`Falha ao registrar status "conferida=${newStatus}" para nota ID ${idNota}`);
+        }
+      })
+    );
+  });
+
+  try {
+    await Promise.all(promessas);
+    
+    let oper = typeof getOperador === "function" ? getOperador() : "Operador";
+    await supabase.from("logs_auditoria").insert([
+      {
+        operador: oper,
+        acao: "CONFERIR_NOTAS",
+        entidade: `${checkedBoxes.length} registros`,
+        recurso: "Modulação de Status por Lote",
+        descricao: `Lote de ${checkedBoxes.length} notas processadas com sucesso.`
+      }
+    ]);
+    
+    showToast(`Sucesso! ${checkedBoxes.length} notas alteradas no banco de dados.`, "success");
+  } catch (error) {
+    console.error("Erro ao registrar conferências:", error);
+    showToast("Erro ao processar as alterações de conferência.", "error");
+  } finally {
+    window.isBatchUpdating = false;
+    // Single render call to refresh list state and keep UI perfectly updated
+    if (typeof renderNotas === "function") {
+      await renderNotas(false);
+    }
+    if (typeof renderAuditoria === "function") {
+      await renderAuditoria(true);
+    }
+  }
+}
+window.conferirNotasLote = conferirNotasLote;

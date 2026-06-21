@@ -143,6 +143,7 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
               outro_municipio,
               cod_servico,
               status_servico,
+              conferida,
               condominios(razao_social),
               empresas(razao_social)
           `,
@@ -188,6 +189,7 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
           outroMunicipio: !!n.outro_municipio,
           codServico: n.cod_servico || "",
           statusServico: n.status_servico || "",
+          conferida: !!n.conferida,
         }));
         window.notasDoMes = [...window.dbNotas];
       }
@@ -329,6 +331,13 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
     filtradas = filtradas.filter((n) => n.outroMunicipio === true);
   }
 
+  // Apply "À Conferir" Filter
+  const fltAConferirEl = document.getElementById("fltAConferir");
+  const fltAConferir = fltAConferirEl ? fltAConferirEl.checked : false;
+  if (fltAConferir) {
+    filtradas = filtradas.filter((n) => !n.conferida);
+  }
+
   // Sorting
   if (window.sortState.notas.col) {
     filtradas.sort((a, b) => {
@@ -389,8 +398,25 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
       (x) => String(x.cnpj) === String(n.cnpj).replace(/[^\d]+/g, ""),
     );
     let displayNomeEmp = e ? e.nome : n.nomeEmp;
+
+    // Dynamic row background for checked notes
+    let rowBgClass = "hover:bg-blue-50 transition-colors cursor-pointer bg-white";
+    let rowStyle = "";
+    if (n.conferida) {
+      rowBgClass = "hover:bg-green-200 transition-colors cursor-pointer bg-green-100";
+      rowStyle = 'style="background-color: #d1fae5;"';
+    }
+
+    // Leftmost column for checkbox
+    let colConferirHtml = window.modoConferencia
+      ? `<td class="p-2 text-center border-r border-slate-200 bg-slate-100 col-conferir-cell" onclick="event.stopPropagation()">
+          <input type="checkbox" class="chk-conferir rounded text-emerald-600 border-slate-300 focus:ring-0 cursor-pointer" data-id="${n.id}">
+         </td>`
+      : `<td class="col-conferir-cell" style="display: none;"></td>`;
+
     grid.innerHTML += `
-      <tr class="hover:bg-blue-50 transition-colors cursor-pointer bg-white" ondblclick="window.startEditRow('notas', '${uniqueId}', this, event)">
+      <tr class="${rowBgClass}" ${rowStyle} data-id="${n.id}" ondblclick="window.startEditRow('notas', '${uniqueId}', this, event)">
+        ${colConferirHtml}
         <td class="p-2 text-center font-mono font-bold text-slate-600 bg-slate-100 border-r border-slate-200 editable-cell" data-prop="codCond">${n.codCond}</td>
         <td class="p-2 font-medium truncate max-w-xs border-r border-slate-200" data-prop="nomeCond">${n.nomeCond}</td>
         <td class="p-2 truncate font-mono text-slate-700 max-w-xs border-r border-slate-200 editable-cell" data-prop="cnpj">${mascararCNPJ(n.cnpj)}</td>
@@ -420,6 +446,16 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
       </tr>
     `;
   });
+
+  const thConferir = document.getElementById("th-conferir");
+  if (thConferir) {
+    thConferir.style.display = window.modoConferencia ? "table-cell" : "none";
+  }
+  const chkSelTodas = document.getElementById("chk-selecionar-todas");
+  if (chkSelTodas) {
+    chkSelTodas.checked = false;
+  }
+
   const labelEl = document.getElementById("qtdeNotas");
   if (labelEl) {
     if (window.modoConferencia) {
@@ -671,6 +707,14 @@ export function alternarModoConferencia() {
       btn.innerHTML = `<span class="material-symbols-outlined text-[15px]">checklist</span> <span>Exibir Todos os Lançamentos</span>`;
       btn.className = "px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white font-bold text-[11px] uppercase rounded border border-slate-600 transition-colors focus:outline-none flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer";
       showToast("Exibindo apenas os últimos 20 lançamentos mais recentes.", "info");
+    }
+  }
+  const btnLote = document.getElementById("btnConferirNotasLote");
+  if (btnLote) {
+    if (window.modoConferencia) {
+      btnLote.classList.remove("hidden");
+    } else {
+      btnLote.classList.add("hidden");
     }
   }
   renderNotas(false);
