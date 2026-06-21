@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+:root {
+  --app-font-scale: 1;
+}
+
+#tela-dashboard {
+  zoom: var(--app-font-scale, 1);
+  transform-origin: top center;
+  transition: zoom 0.15s ease-out;
+}

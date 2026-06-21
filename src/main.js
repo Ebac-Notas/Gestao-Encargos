@@ -75,6 +75,192 @@ function getEl(id) {
   return document.getElementById(id);
 }
 
+// --- MINIMALIST FILTER TRANSITION FUNCTION ---
+export function toggleFiltroInterativo(forceState) {
+  const cnt = getEl("cntFiltroInterativo");
+  const btnCloseLeft = getEl("btnFiltroCloseLeft");
+  const btnCloseRight = getEl("btnFiltroCloseRight");
+  const content = getEl("conteudoFiltros");
+  const btnTrigger = getEl("btnFiltroTrigger");
+
+  if (!cnt) return;
+
+  const isExpanded = cnt.classList.contains("expanded");
+  const nextExpanded = forceState !== undefined ? forceState : !isExpanded;
+
+  if (nextExpanded) {
+    cnt.classList.add("expanded");
+    cnt.classList.remove("w-28", "px-4", "justify-center", "cursor-pointer", "hover:bg-slate-50", "hover:border-slate-400");
+    cnt.classList.add("w-[660px]", "px-10", "bg-white", "border-slate-400");
+
+    if (btnCloseLeft) btnCloseLeft.classList.remove("hidden");
+    if (btnCloseRight) btnCloseRight.classList.remove("hidden");
+
+    if (content) {
+      content.classList.remove("opacity-0", "max-w-0", "pointer-events-none");
+      content.classList.add("opacity-100", "max-w-[500px]");
+    }
+    
+    if (btnTrigger) {
+      btnTrigger.classList.add("border-r", "border-slate-200", "pr-3", "mr-3", "pointer-events-none");
+    }
+  } else {
+    cnt.classList.remove("expanded");
+    cnt.classList.remove("w-[660px]", "px-10", "border-slate-400");
+    cnt.classList.add("w-28", "px-4", "justify-center", "cursor-pointer", "hover:bg-slate-50", "hover:border-slate-400");
+
+    if (btnCloseLeft) btnCloseLeft.classList.add("hidden");
+    if (btnCloseRight) btnCloseRight.classList.add("hidden");
+
+    if (content) {
+      content.classList.add("opacity-0", "max-w-0", "pointer-events-none");
+      content.classList.remove("opacity-100", "max-w-[500px]");
+    }
+
+    if (btnTrigger) {
+      btnTrigger.classList.remove("border-r", "border-slate-200", "pr-3", "mr-3", "pointer-events-none");
+    }
+  }
+}
+window.toggleFiltroInterativo = toggleFiltroInterativo;
+
+// --- DYNAMIC FONT ZOOM / SCALING ENGINE WITH COLLAPSE / AUTOCLOSE ---
+let fonteInatividadeTimeoutId = null;
+window.isMouseOverFonte = false;
+
+export function resetFonteInatividadeTimer() {
+  if (fonteInatividadeTimeoutId) {
+    clearTimeout(fonteInatividadeTimeoutId);
+    fonteInatividadeTimeoutId = null;
+  }
+  if (window.isMouseOverFonte) {
+    // Se o mouse estiver por cima, impede o recolhimento automático
+    return;
+  }
+  fonteInatividadeTimeoutId = setTimeout(() => {
+    toggleFonteInterativa(false);
+  }, 5000);
+}
+
+export function toggleFonteInterativa(forceState) {
+  const cnt = getEl("cntFonteInterativa");
+  const btnCloseLeft = getEl("btnFonteCloseLeft");
+  const btnCloseRight = getEl("btnFonteCloseRight");
+  const content = getEl("conteudoFonte");
+  const btnTrigger = getEl("btnFonteTrigger");
+
+  if (!cnt) return;
+
+  const isExpanded = cnt.classList.contains("expanded");
+  const nextExpanded = forceState !== undefined ? forceState : !isExpanded;
+
+  if (nextExpanded) {
+    cnt.classList.add("expanded");
+    cnt.classList.remove("w-28", "px-3", "justify-center", "cursor-pointer", "hover:bg-slate-50", "hover:border-slate-400");
+    cnt.classList.add("w-[320px]", "px-4", "bg-white", "border-slate-400");
+
+    if (btnCloseLeft) btnCloseLeft.classList.remove("hidden");
+    if (btnCloseRight) btnCloseRight.classList.remove("hidden");
+
+    if (content) {
+      content.classList.remove("opacity-0", "max-w-0", "pointer-events-none");
+      content.classList.add("opacity-100", "max-w-[280px]");
+    }
+    
+    if (btnTrigger) {
+      btnTrigger.classList.add("border-r", "border-slate-200", "pr-2", "mr-2", "pointer-events-none");
+    }
+
+    resetFonteInatividadeTimer();
+  } else {
+    cnt.classList.remove("expanded");
+    cnt.classList.remove("w-[320px]", "px-4", "border-slate-400");
+    cnt.classList.add("w-28", "px-3", "justify-center", "cursor-pointer", "hover:bg-slate-50", "hover:border-slate-400");
+
+    if (btnCloseLeft) btnCloseLeft.classList.add("hidden");
+    if (btnCloseRight) btnCloseRight.classList.add("hidden");
+
+    if (content) {
+      content.classList.add("opacity-0", "max-w-0", "pointer-events-none");
+      content.classList.remove("opacity-100", "max-w-[280px]");
+    }
+
+    if (btnTrigger) {
+      btnTrigger.classList.remove("border-r", "border-slate-200", "pr-2", "mr-2", "pointer-events-none");
+    }
+
+    if (fonteInatividadeTimeoutId) {
+      clearTimeout(fonteInatividadeTimeoutId);
+      fonteInatividadeTimeoutId = null;
+    }
+  }
+}
+
+export function aplicarTamanhoFonte(escala) {
+  const minScale = 90;
+  const maxScale = 115;
+  const safeEscala = Math.max(minScale, Math.min(maxScale, escala));
+  
+  localStorage.setItem("appFontScale", safeEscala);
+
+  // Apply scale as a CSS variable on the html root
+  document.documentElement.style.setProperty("--app-font-scale", safeEscala / 100);
+
+  // Directly apply inline zoom property to #tela-dashboard
+  const dashboard = getEl("tela-dashboard");
+  if (dashboard) {
+    dashboard.style.zoom = safeEscala / 100;
+  }
+
+  // Update UI Select Preset
+  const selectPreset = getEl("selTamanhoPreset");
+  if (selectPreset) {
+    if (["90", "95", "100", "105", "110", "115"].includes(String(safeEscala))) {
+      selectPreset.value = String(safeEscala);
+    } else {
+      let optCustom = selectPreset.querySelector('option[value="custom"]');
+      if (!optCustom) {
+        optCustom = document.createElement("option");
+        optCustom.value = "custom";
+        selectPreset.appendChild(optCustom);
+      }
+      optCustom.text = `Customizado (${safeEscala}%)`;
+      optCustom.selected = true;
+    }
+  }
+
+  // Update UI percentage label
+  const lblTamanhoAtual = getEl("lblTamanhoAtual");
+  if (lblTamanhoAtual) {
+    lblTamanhoAtual.innerText = `${safeEscala}%`;
+  }
+}
+
+export function selecionarTamanhoPreset(val) {
+  if (val === "custom") return;
+  const scale = parseInt(val, 10) || 100;
+  aplicarTamanhoFonte(scale);
+}
+
+export function ajustarEscalaFina(delta) {
+  let scale = parseInt(localStorage.getItem("appFontScale"), 10) || 100;
+  scale += delta;
+  aplicarTamanhoFonte(scale);
+}
+
+export function carregarPreferenciaTamanhoFonte() {
+  const savedScale = parseInt(localStorage.getItem("appFontScale"), 10) || 100;
+  aplicarTamanhoFonte(savedScale);
+}
+
+window.toggleFonteInterativa = toggleFonteInterativa;
+window.resetFonteInatividadeTimer = resetFonteInatividadeTimer;
+window.aplicarTamanhoFonte = aplicarTamanhoFonte;
+window.selecionarTamanhoPreset = selecionarTamanhoPreset;
+window.ajustarEscalaFina = ajustarEscalaFina;
+window.carregarPreferenciaTamanhoFonte = carregarPreferenciaTamanhoFonte;
+
+
 // --- MAIN BUSINESS FUNCTIONS ---
 export function getOperador() {
   const el = getEl("nome-operador");
@@ -2590,5 +2776,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  carregarPreferenciaTamanhoFonte();
   verificarAutenticacao();
 });

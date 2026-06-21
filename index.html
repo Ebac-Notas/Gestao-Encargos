@@ -311,62 +311,97 @@
                 </button>
               </div>
             </div>
+            <!-- Botão de Filtros Interativo Minimalista e Moderno -->
             <div
-              class="flex items-center gap-4 text-[11px] font-bold text-slate-700 bg-white border border-slate-300 px-3 py-1 rounded shadow-sm"
+              id="cntFiltroInterativo"
+              class="relative flex items-center transition-all duration-500 ease-out h-9 bg-white border border-slate-300 rounded-full shadow-sm select-none w-28 px-4 justify-center overflow-hidden cursor-pointer hover:border-slate-400 hover:bg-slate-50"
+              onclick="if (!this.classList.contains('expanded')) toggleFiltroInterativo(true)"
             >
-              <span class="uppercase text-slate-500 mr-1"
-                >Filtro de Encargos (>0):</span
+              <!-- Borda/Parentesco Esquerda (Clicável para fechar ao expandir) -->
+              <button
+                id="btnFiltroCloseLeft"
+                onclick="event.stopPropagation(); toggleFiltroInterativo(false)"
+                class="absolute left-0 top-0 bottom-0 w-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer hidden rounded-l-full border-r border-slate-200"
+                title="Fechar Filtros"
               >
-              <label class="flex items-center gap-1 cursor-pointer"
-                ><input
-                  type="checkbox"
-                  id="fltISS"
-                  class="flt-encargo"
-                  onchange="renderNotas(false)"
-                />
-                ISS</label
+                <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+              </button>
+
+              <!-- Central Trigger Label Area -->
+              <div
+                id="btnFiltroTrigger"
+                class="flex items-center gap-1.5 transition-all duration-500 ease-out"
               >
-              <label
-                class="flex items-center gap-1 cursor-pointer text-blue-700"
-                ><input
-                  type="checkbox"
-                  class="flt-encargo"
-                  id="fltINSS"
-                  onchange="renderNotas(false)"
-                />
-                INSS</label
+                <span class="material-symbols-outlined text-slate-500 text-[18px]">filter_list</span>
+                <span class="text-xs font-bold text-slate-700">Filtros</span>
+              </div>
+
+              <!-- Centro Expandido: Filtros Atuais -->
+              <div
+                id="conteudoFiltros"
+                class="flex items-center gap-4 text-[11px] font-bold text-slate-700 opacity-0 max-w-0 pointer-events-none transition-all duration-500 ease-out whitespace-nowrap"
               >
-              <label
-                class="flex items-center gap-1 cursor-pointer text-purple-700"
-                ><input
-                  type="checkbox"
-                  class="flt-encargo"
-                  id="fltIR"
-                  onchange="renderNotas(false)"
-                />
-                IR</label
+                <label class="flex items-center gap-1 cursor-pointer transition-colors hover:text-slate-900 select-none"
+                  ><input
+                    type="checkbox"
+                    id="fltISS"
+                    class="flt-encargo rounded text-slate-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
+                    onchange="renderNotas(false)"
+                  />
+                  ISS</label
+                >
+                <label
+                  class="flex items-center gap-1 cursor-pointer text-blue-700 transition-colors hover:text-blue-900 select-none"
+                  ><input
+                    type="checkbox"
+                    class="flt-encargo rounded text-blue-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
+                    id="fltINSS"
+                    onchange="renderNotas(false)"
+                  />
+                  INSS</label
+                >
+                <label
+                  class="flex items-center gap-1 cursor-pointer text-purple-700 transition-colors hover:text-purple-900 select-none"
+                  ><input
+                    type="checkbox"
+                    class="flt-encargo rounded text-purple-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
+                    id="fltIR"
+                    onchange="renderNotas(false)"
+                  />
+                  IR</label
+                >
+                <label
+                  class="flex items-center gap-1 cursor-pointer text-orange-700 transition-colors hover:text-orange-950 select-none"
+                  ><input
+                    type="checkbox"
+                    class="flt-encargo rounded text-orange-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
+                    id="fltPIS"
+                    onchange="renderNotas(false)"
+                  />
+                  PIS/COFINS</label
+                >
+                <label
+                  class="flex items-center gap-1 cursor-pointer text-amber-600 hover:text-amber-800 font-extrabold border-l border-slate-200 pl-3 uppercase select-none"
+                  title="Filtrar por Nota de Outros Municípios"
+                  ><input
+                    type="checkbox"
+                    class="flt-encargo rounded text-amber-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
+                    id="fltOutroMunicipio"
+                    onchange="renderNotas(false)"
+                  />
+                  Outros Municípios</label
+                >
+              </div>
+
+              <!-- Borda/Parentesco Direita (Clicável para fechar ao expandir) -->
+              <button
+                id="btnFiltroCloseRight"
+                onclick="event.stopPropagation(); toggleFiltroInterativo(false)"
+                class="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer hidden rounded-r-full border-l border-slate-200"
+                title="Fechar Filtros"
               >
-              <label
-                class="flex items-center gap-1 cursor-pointer text-orange-700"
-                ><input
-                  type="checkbox"
-                  class="flt-encargo"
-                  id="fltPIS"
-                  onchange="renderNotas(false)"
-                />
-                PIS/COFINS</label
-              >
-              <label
-                class="flex items-center gap-1 cursor-pointer text-amber-600 font-extrabold border-l border-slate-300 pl-3 uppercase"
-                title="Filtrar por Nota de Outros Municípios"
-                ><input
-                  type="checkbox"
-                  class="flt-encargo"
-                  id="fltOutroMunicipio"
-                  onchange="renderNotas(false)"
-                />
-                Outros Municípios</label
-              >
+                <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+              </button>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -524,13 +559,96 @@
             </table>
           </div>
           <footer
-            class="h-7 bg-slate-200 border-t border-slate-300 flex items-center px-4 shrink-0 text-[10px] text-slate-600 font-medium"
+            class="h-7 bg-slate-200 border-t border-slate-300 flex items-center px-4 shrink-0 text-[10px] text-slate-600 font-medium justify-between font-bold"
           >
-            <span class="mr-4">PRONTO</span> |
-            <span class="mx-4 font-mono">MODO: VISUALIZAÇÃO</span> |
-            <span class="ml-4 font-mono font-bold" id="qtdeNotas"
-              >TOTAL REGISTROS: 0</span
-            >
+            <div class="flex items-center gap-2">
+              <span class="mr-2">PRONTO</span>
+              <span class="text-slate-400">|</span>
+              <span class="font-mono font-bold ml-2" id="qtdeNotas">TOTAL REGISTROS: 0</span>
+            </div>
+            
+            <!-- Controle Interativo de tamanho de fonte -->
+            <div class="flex items-center gap-3">
+              <div
+                id="cntFonteInterativa"
+                class="relative flex items-center transition-all duration-500 ease-out h-[22px] bg-white border border-slate-300 rounded-full shadow-sm select-none w-28 px-3 justify-center overflow-hidden cursor-pointer hover:border-slate-400 hover:bg-slate-50"
+                onclick="if (!this.classList.contains('expanded')) toggleFonteInterativa(true)"
+                onmouseenter="window.isMouseOverFonte = true; resetFonteInatividadeTimer();"
+                onmouseleave="window.isMouseOverFonte = false; resetFonteInatividadeTimer();"
+              >
+                <!-- Borda/Parentesco Esquerda (Clicável para fechar) -->
+                <button
+                  id="btnFonteCloseLeft"
+                  type="button"
+                  onclick="event.stopPropagation(); toggleFonteInterativa(false)"
+                  class="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer hidden rounded-l-full border-r border-slate-200"
+                  title="Fechar Ajuste"
+                >
+                  <span class="material-symbols-outlined text-[11px]">chevron_left</span>
+                </button>
+
+                <!-- Central Trigger Label Area -->
+                <div
+                  id="btnFonteTrigger"
+                  class="flex items-center gap-1 transition-all duration-500 ease-out"
+                >
+                  <span class="material-symbols-outlined text-slate-500 text-[13px]">format_size</span>
+                  <span class="text-[9px] font-bold text-slate-700 uppercase tracking-wider">Ajuste Letra</span>
+                </div>
+
+                <!-- Centro Expandido: Opções de Tamanho -->
+                <div
+                  id="conteudoFonte"
+                  class="flex items-center gap-2 text-[10px] opacity-0 max-w-0 pointer-events-none transition-all duration-500 ease-out whitespace-nowrap pl-2"
+                >
+                  <span class="font-bold text-slate-650 uppercase text-[9px] tracking-wider">Letra:</span>
+                  
+                  <select 
+                    id="selTamanhoPreset"
+                    onchange="selecionarTamanhoPreset(this.value); resetFonteInatividadeTimer();"
+                    class="bg-transparent border-none text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-0 py-0 pl-1 pr-4 cursor-pointer"
+                  >
+                    <option value="90">90% (Pequena)</option>
+                    <option value="95">95% (Suave -)</option>
+                    <option value="100" selected>100% (Padrão)</option>
+                    <option value="105">105% (Suave +)</option>
+                    <option value="110">110% (Média)</option>
+                    <option value="115">115% (Grande)</option>
+                  </select>
+
+                  <div class="h-3 w-[1px] bg-slate-300 mx-0.5"></div>
+
+                  <button 
+                    type="button" 
+                    onclick="event.stopPropagation(); ajustarEscalaFina(-1); resetFonteInatividadeTimer();" 
+                    class="w-3.5 h-3.5 flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-full cursor-pointer transition-colors text-[9px] focus:outline-none hover:scale-105" 
+                    title="Diminuir (Ajuste Fino -1%)"
+                  >
+                    -
+                  </button>
+                  <span id="lblTamanhoAtual" class="font-mono font-bold text-slate-700 px-0.5 text-[9px] min-w-[24px] text-center">100%</span>
+                  <button 
+                    type="button" 
+                    onclick="event.stopPropagation(); ajustarEscalaFina(1); resetFonteInatividadeTimer();" 
+                    class="w-3.5 h-3.5 flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-full cursor-pointer transition-colors text-[9px] focus:outline-none hover:scale-105" 
+                    title="Aumentar (Ajuste Fino +1%)"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <!-- Borda/Parentesco Direita (Clicável para fechar) -->
+                <button
+                  id="btnFonteCloseRight"
+                  type="button"
+                  onclick="event.stopPropagation(); toggleFonteInterativa(false)"
+                  class="absolute right-0 top-0 bottom-0 w-6 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer hidden rounded-r-full border-l border-slate-200"
+                  title="Fechar Ajuste"
+                >
+                  <span class="material-symbols-outlined text-[11px]">chevron_right</span>
+                </button>
+              </div>
+            </div>
           </footer>
         </section>
 
