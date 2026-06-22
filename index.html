@@ -425,25 +425,38 @@
                 <span class="material-symbols-outlined text-[16px]">chevron_right</span>
               </button>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="relative inline-block text-left" id="dropdownExportar">
               <button
-                onclick="exportarExcel()"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+                type="button"
+                onclick="window.toggleDropdownExportar(event)"
+                class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1.5 shadow-sm transition-all focus:ring-2 focus:ring-slate-400 focus:outline-none select-none cursor-pointer"
+                id="btnDropdownExportar"
               >
-                <span class="material-symbols-outlined text-[16px]"
-                  >download</span
-                >
-                Exportar Excel (.xls)
+                <span class="material-symbols-outlined text-[16px]">download</span>
+                <span>Exportar</span>
+                <span class="material-symbols-outlined text-[16px] transition-transform duration-200" id="arrowDropdownExportar">expand_more</span>
               </button>
-              <button
-                onclick="exportarPdf()"
-                class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase px-3 py-1.5 rounded flex items-center gap-1 shadow-sm transition-colors focus:ring-2 focus:ring-red-400 focus:outline-none"
+              <div
+                id="menuExportar"
+                class="hidden absolute right-0 mt-1.5 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50 divide-y divide-slate-100"
               >
-                <span class="material-symbols-outlined text-[16px]"
-                  >picture_as_pdf</span
-                >
-                Imprimir PDF
-              </button>
+                <div class="py-1">
+                  <button
+                    onclick="exportarExcel(); window.toggleDropdownExportar(null, false)"
+                    class="group flex items-center w-full px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-950 font-semibold gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <span class="material-symbols-outlined text-[18px] text-emerald-600">border_all</span>
+                    <span>Excel (.xls)</span>
+                  </button>
+                  <button
+                    onclick="exportarPdf(); window.toggleDropdownExportar(null, false)"
+                    class="group flex items-center w-full px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-950 font-semibold gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <span class="material-symbols-outlined text-[18px] text-rose-600">picture_as_pdf</span>
+                    <span>PDF / Imprimir</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="flex-1 overflow-auto bg-slate-50">
@@ -591,6 +604,38 @@
                 <!-- Renderizado dinamicamente -->
               </tbody>
             </table>
+          </div>
+          <!-- Pagination Control Bar (only visible/functional in "Todos os lançamentos" mode) -->
+          <div
+            id="paginacaoNotas"
+            class="hidden bg-slate-100 border-t border-slate-300 px-4 py-2 flex items-center justify-between shrink-0 select-none text-xs"
+          >
+            <div class="flex items-center gap-2 font-medium text-slate-500">
+              Exibindo <span id="pagSurgindoInfo" class="font-mono font-bold text-slate-800">0 - 0</span> de <span id="pagTotalInfo" class="font-mono font-bold text-slate-800">0</span> lançamentos
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                id="btnPagAnterior"
+                onclick="window.mudarPaginaNotas(-1)"
+                class="px-2.5 py-1 text-[11px] rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white flex items-center gap-1 font-bold shadow-sm transition-all focus:outline-none shrink-0"
+              >
+                <span class="material-symbols-outlined text-[15px]">chevron_left</span>
+                <span>Anterior</span>
+              </button>
+              <div class="px-3 py-1 font-mono font-bold text-slate-700 bg-slate-200 border border-slate-300 rounded shadow-inner text-[11px]">
+                Página <span id="pagAtual">1</span> de <span id="pagTotal">1</span>
+              </div>
+              <button
+                type="button"
+                id="btnPagProxima"
+                onclick="window.mudarPaginaNotas(1)"
+                class="px-2.5 py-1 text-[11px] rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white flex items-center gap-1 font-bold shadow-sm transition-all focus:outline-none shrink-0"
+              >
+                <span>Próxima</span>
+                <span class="material-symbols-outlined text-[15px]">chevron_right</span>
+              </button>
+            </div>
           </div>
           <footer
             class="h-7 bg-slate-200 border-t border-slate-300 flex items-center px-4 shrink-0 text-[10px] text-slate-600 font-medium justify-between font-bold"

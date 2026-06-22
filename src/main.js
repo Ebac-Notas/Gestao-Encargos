@@ -36,6 +36,9 @@ window.notasDoMes = [];
 window.dbAuditoria = [];
 window.modoConferencia = false;
 window.isBatchUpdating = false;
+window.paginaAtualNotas = 1;
+window.itensPorPaginaNotas = 50;
+window.notasFiltradasAtivas = [];
 window.sortState = {
   notas: { col: "", asc: true },
   empresas: { col: "", asc: true },
@@ -906,31 +909,63 @@ export async function verificarAutenticacao() {
 window.verificarAutenticacao = verificarAutenticacao;
 
 // Export functions
+export function limparTabelaParaExportacao(tableClone) {
+  const thead = tableClone.querySelector("thead");
+  if (!thead) return;
+  const headers = Array.from(thead.querySelectorAll("th"));
+  
+  const indicesToRemove = [];
+  const realTable = getEl("tableNotas");
+  const realPccDet = realTable ? realTable.querySelector(".col-pcc-det") : null;
+  const hideDetailedPcc = realPccDet ? realPccDet.classList.contains("hidden") : true;
+
+  headers.forEach((th, idx) => {
+    const text = th.textContent.toLowerCase();
+    const isConferir = th.id === "th-conferir" || th.querySelector("input[type=checkbox]");
+    const isOperador = text.includes("operador");
+    const isAcoes = text.includes("ações") || text.includes("acoes") || text.includes("delete") || text.includes("excluir");
+    const isDetailedPcc = th.classList.contains("col-pcc-det");
+
+    if (isConferir || isOperador || isAcoes || (isDetailedPcc && hideDetailedPcc)) {
+      indicesToRemove.push(idx);
+    }
+  });
+
+  // Sort indices descending to remove from the end first without shifting preceding columns
+  indicesToRemove.sort((a, b) => b - a);
+
+  const rows = Array.from(tableClone.querySelectorAll("tr"));
+  rows.forEach((row) => {
+    indicesToRemove.forEach((idx) => {
+      if (row.cells[idx]) {
+        row.deleteCell(idx);
+      }
+    });
+  });
+}
+window.limparTabelaParaExportacao = limparTabelaParaExportacao;
+
 export function exportarExcel() {
   let table = getEl("tableNotas").cloneNode(true);
-  Array.from(table.rows).forEach((r) => r.deleteCell(-1));
+  
+  // Replace the tbody with all filtered rows of the period (un-paginated!)
+  const tbody = table.querySelector("tbody");
+  if (tbody && window.notasFiltradasAtivas && window.notasFiltradasAtivas.length > 0) {
+    let allRowsHtml = "";
+    window.notasFiltradasAtivas.forEach((n) => {
+      allRowsHtml += window.obterRowHtml(n);
+    });
+    tbody.innerHTML = allRowsHtml;
+  }
+
+  // Pure clean: remove checkbox column, Operador, Ações, and hidden detailed PCC column
+  limparTabelaParaExportacao(table);
 
   let thead = table.querySelector("thead");
   if (thead) {
     let cells = thead.querySelectorAll("th");
-    cells.forEach((cell, idx) => {
-      let text = "";
-      if (idx === 0) text = "Cód. Cond.";
-      else if (idx === 1) text = "Nome do Condomínio";
-      else if (idx === 2) text = "CNPJ";
-      else if (idx === 3) text = "Nome Emissor";
-      else if (idx === 4) text = "Nº Nota";
-      else if (idx === 5) text = "Data Emissão";
-      else if (idx === 6) text = "Valor Total";
-      else if (idx === 7) text = "ISS";
-      else if (idx === 8) text = "INSS";
-      else if (idx === 9) text = "IR";
-      else if (cell.classList.contains("col-pcc-det") && cell.innerHTML.includes("PIS")) text = "PIS";
-      else if (cell.classList.contains("col-pcc-det") && cell.innerHTML.includes("COFINS")) text = "COFINS";
-      else if (cell.classList.contains("col-pcc-det") && cell.innerHTML.includes("CSLL")) text = "CSLL";
-      else if (idx === 10 || cell.textContent.includes("PCC")) text = "PCC";
-      else text = cell.textContent.replace(/↕/g, "").replace(/\[\+\]/g, "").trim();
-
+    cells.forEach((cell) => {
+      let text = cell.textContent.replace(/↕/g, "").replace(/\[\+\]/g, "").replace(/\[\-\]/g, "").trim();
       cell.innerHTML = `<strong>${text}</strong>`;
     });
   }
@@ -975,16 +1010,39 @@ export function exportarPdf() {
     let win = window.open("", "_blank");
     if (win) {
       let tableClone = getEl("tableNotas").cloneNode(true);
-      Array.from(tableClone.rows).forEach((r) => r.deleteCell(-1));
+      
+      // Replace the tbody with all filtered rows of the period (un-paginated!)
+      const tbody = tableClone.querySelector("tbody");
+      if (tbody && window.notasFiltradasAtivas && window.notasFiltradasAtivas.length > 0) {
+        let allRowsHtml = "";
+        window.notasFiltradasAtivas.forEach((n) => {
+          allRowsHtml += window.obterRowHtml(n);
+        });
+        tbody.innerHTML = allRowsHtml;
+      }
+
+      // Pure clean: remove checkbox column, Operador, Ações, and hidden detailed PCC column
+      limparTabelaParaExportacao(tableClone);
+
+      let thead = tableClone.querySelector("thead");
+      if (thead) {
+        let cells = thead.querySelectorAll("th");
+        cells.forEach((cell) => {
+          let text = cell.textContent.replace(/↕/g, "").replace(/\[\+\]/g, "").replace(/\[\-\]/g, "").trim();
+          cell.innerHTML = text;
+        });
+      }
+
       win.document.write(`
               <html>
               <head>
                   <title>Notas Fiscais</title>
                   <style>
-                      body { font-family: sans-serif; }
-                      table { border-collapse: collapse; width: 100%; font-size: 11px; }
-                      th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-                      th { background-color: #eee; }
+                      body { font-family: sans-serif; margin: 20px; color: #334155; }
+                      h2 { font-size: 16px; color: #1e293b; margin-bottom: 20px; font-family: sans-serif; font-weight: bold; }
+                      table { border-collapse: collapse; width: 100%; font-size: 10px; }
+                      th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+                      th { background-color: #f1f5f9; font-weight: bold; color: #475569; }
                       .text-right { text-align: right; }
                       .text-center { text-align: center; }
                   </style>
@@ -1007,6 +1065,32 @@ export function exportarPdf() {
   }
 }
 window.exportarPdf = exportarPdf;
+
+export function toggleDropdownExportar(event, forceState) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const menu = document.getElementById("menuExportar");
+  const arrow = document.getElementById("arrowDropdownExportar");
+  if (!menu) return;
+  
+  const isHidden = menu.classList.contains("hidden");
+  const show = typeof forceState === "boolean" ? forceState : isHidden;
+
+  if (show) {
+    menu.classList.remove("hidden");
+    if (arrow) arrow.style.transform = "rotate(180deg)";
+  } else {
+    menu.classList.add("hidden");
+    if (arrow) arrow.style.transform = "rotate(0deg)";
+  }
+}
+window.toggleDropdownExportar = toggleDropdownExportar;
+
+// Close dropdown on click outside
+document.addEventListener("click", () => {
+  toggleDropdownExportar(null, false);
+});
 
 // --- INLINE AND BULK ACTIONS ---
 export async function toggleStatusServicoClick(e, uniqueId) {
@@ -2281,6 +2365,7 @@ window.addEventListener("DOMContentLoaded", () => {
         let raw = el.value.replace(/[^\d]+/g, "");
         if (raw) {
           e.preventDefault();
+          window.cnpjJaProcessadoTeclado = true;
 
           if (raw.length === 12 || raw.length === 13) {
             raw = raw.padStart(14, "0");
@@ -2478,6 +2563,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     iptCnpj.addEventListener("blur", async function () {
       setTimeout(async () => {
+        if (window.cnpjJaProcessadoTeclado) {
+          window.cnpjJaProcessadoTeclado = false;
+          return;
+        }
         if (!listaCnpj.classList.contains("hidden")) {
           listaCnpj.classList.add("hidden");
           iptRazaoSocial.value = "";
@@ -2817,7 +2906,10 @@ export async function conferirNotasLote() {
     const idNota = cb.getAttribute("data-id");
     
     // Find matching note in our local cache to determine current status
-    const notaDb = window.dbNotas.find(n => String(n.id) === String(idNota));
+    const dbNotasArray = Array.isArray(window.dbNotas) ? window.dbNotas : [];
+    const notasDoMesArray = Array.isArray(window.notasDoMes) ? window.notasDoMes : [];
+    
+    const notaDb = dbNotasArray.find(n => String(n.id) === String(idNota));
     const currentStatus = notaDb ? !!notaDb.conferida : false;
     // Toggle (reverse) the status!
     const newStatus = !currentStatus;
@@ -2826,8 +2918,8 @@ export async function conferirNotasLote() {
     const tr = cb.closest("tr");
     if (tr) {
       if (newStatus) {
-        tr.className = "hover:bg-green-200 transition-colors cursor-pointer bg-green-100";
-        tr.style.backgroundColor = "#d1fae5"; // Beautiful soft-mid green, darker than before
+        tr.className = "hover:bg-green-250 transition-colors cursor-pointer bg-green-100";
+        tr.style.backgroundColor = "#bbf7d0"; // Beautiful soft-mid green, darker than before (#bbf7d0 is distinct and legible)
       } else {
         tr.className = "hover:bg-blue-50 transition-colors cursor-pointer bg-white";
         tr.style.backgroundColor = "";
@@ -2835,7 +2927,7 @@ export async function conferirNotasLote() {
     }
 
     // Update state objects instantly in memory
-    const notaMem = window.notasDoMes.find(n => String(n.id) === String(idNota));
+    const notaMem = notasDoMesArray.find(n => String(n.id) === String(idNota));
     if (notaMem) {
       notaMem.conferida = newStatus;
     }
@@ -2883,3 +2975,18 @@ export async function conferirNotasLote() {
   }
 }
 window.conferirNotasLote = conferirNotasLote;
+
+export function mudarPaginaNotas(direcao) {
+  const totItens = window.notasFiltradasAtivas ? window.notasFiltradasAtivas.length : 0;
+  const itemsPerPage = window.itensPorPaginaNotas || 50;
+  const totPaginas = Math.ceil(totItens / itemsPerPage) || 1;
+  const novaPagina = window.paginaAtualNotas + direcao;
+
+  if (novaPagina >= 1 && novaPagina <= totPaginas) {
+    window.paginaAtualNotas = novaPagina;
+    if (typeof renderNotas === "function") {
+      renderNotas(false);
+    }
+  }
+}
+window.mudarPaginaNotas = mudarPaginaNotas;
