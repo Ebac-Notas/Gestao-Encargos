@@ -53,7 +53,14 @@ export function showToast(message, type = "info") {
 
 // --- SORTS & DATA STATES ---
 export function sortGrid(gridName, col) {
+  if (gridName === "notes") {
+    gridName = "notas";
+  }
   let st = window.sortState[gridName];
+  if (!st) {
+    window.sortState[gridName] = { col: "", asc: true };
+    st = window.sortState[gridName];
+  }
   if (st.col === col) {
     st.asc = !st.asc;
   } else {
@@ -759,6 +766,12 @@ export async function renderAuditoria(fetchFirst = true) {
 
 export function alternarModoConferencia() {
   window.modoConferencia = !window.modoConferencia;
+  
+  // Clear sorting column when entering conference mode so it uses the preset tertiary sorting
+  if (window.modoConferencia && window.sortState && window.sortState.notas) {
+    window.sortState.notas.col = "";
+  }
+
   const btn = document.getElementById("btnModoConferencia");
   if (btn) {
     if (window.modoConferencia) {
