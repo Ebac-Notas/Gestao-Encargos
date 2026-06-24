@@ -144,37 +144,58 @@ export function recalcularValorLiquido() {
 }
 
 export function calcularPisCofins() {
-  const bruto = parseFloat(document.getElementById("iptValorBruto").value) || 0;
+  const elBruto = document.getElementById("iptValorBruto");
+  if (!elBruto) return;
+  const bruto = parseFloat(elBruto.value) || 0;
   const pis = (bruto * 0.0065).toFixed(2);
   const cofins = (bruto * 0.03).toFixed(2);
   const csll = (bruto * 0.01).toFixed(2);
   
-  document.getElementById("iptPIS").value = pis;
-  document.getElementById("iptCOFINS").value = cofins;
-  document.getElementById("iptCSLL").value = csll;
-  document.getElementById("iptPisVal").value = (
-    parseFloat(pis) +
-    parseFloat(cofins) +
-    parseFloat(csll)
-  ).toFixed(2);
+  const elPis = document.getElementById("iptPIS");
+  const elCofins = document.getElementById("iptCOFINS");
+  const elCsll = document.getElementById("iptCSLL");
+  const elPisVal = document.getElementById("iptPisVal");
+
+  if (elPis) elPis.value = pis;
+  if (elCofins) elCofins.value = cofins;
+  if (elCsll) elCsll.value = csll;
+  if (elPisVal) {
+    elPisVal.value = (
+      parseFloat(pis) +
+      parseFloat(cofins) +
+      parseFloat(csll)
+    ).toFixed(2);
+  }
   
   recalcularValorLiquido();
 }
 
 export function ativarEdicaoPccManual() {
   window.pisModificadoManualmente = true;
-  document.getElementById("boxPccTotal").classList.add("hidden");
-  document.getElementById("boxPccManual").classList.remove("hidden");
-  document.getElementById("boxPccManual").classList.add("grid");
-  document.getElementById("iptPIS").focus();
+  const boxPccTotal = document.getElementById("boxPccTotal");
+  const boxPccManual = document.getElementById("boxPccManual");
+  const iptPIS = document.getElementById("iptPIS");
+
+  if (boxPccTotal) boxPccTotal.classList.add("hidden");
+  if (boxPccManual) {
+    boxPccManual.classList.remove("hidden");
+    boxPccManual.classList.add("grid");
+  }
+  if (iptPIS) iptPIS.focus();
 }
 
 export function atualizarSomaPcc() {
   window.pisModificadoManualmente = true;
-  let p = parseFloat(document.getElementById("iptPIS").value) || 0;
-  let c = parseFloat(document.getElementById("iptCOFINS").value) || 0;
-  let s = parseFloat(document.getElementById("iptCSLL").value) || 0;
-  document.getElementById("iptPisVal").value = (p + c + s).toFixed(2);
+  const elPis = document.getElementById("iptPIS");
+  const elCofins = document.getElementById("iptCOFINS");
+  const elCsll = document.getElementById("iptCSLL");
+  const elPisVal = document.getElementById("iptPisVal");
+
+  let p = elPis ? (parseFloat(elPis.value) || 0) : 0;
+  let c = elCofins ? (parseFloat(elCofins.value) || 0) : 0;
+  let s = elCsll ? (parseFloat(elCsll.value) || 0) : 0;
+
+  if (elPisVal) elPisVal.value = (p + c + s).toFixed(2);
   recalcularValorLiquido();
 }
 

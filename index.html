@@ -9,8 +9,8 @@
       type="image/svg+xml"
       href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23FFFFFF' stroke='%23E2E8F0' stroke-width='1'/><path d='M 18 31 A 14 14 0 0 1 46 31 Z' fill='%23FFE300'/><rect x='12' y='27' width='40' height='10' rx='1.5' fill='%2300D064'/><text x='32.5' y='34.5' font-family='system-ui, -apple-system, sans-serif' font-size='7.5' font-weight='900' fill='%23013A1C' text-anchor='middle' letter-spacing='1.5'>EBAC</text></svg>"
     />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/src/index.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
       rel="stylesheet"
@@ -903,7 +903,7 @@
                     id="iptDiaEmissao"
                     min="1"
                     max="31"
-                    placeholder="Venc. (1-31)"
+                    placeholder="(1-31)"
                     class="border border-slate-300 p-2 text-[14px] rounded focus:outline-none focus:border-emerald-500 font-mono text-center shadow-inner nav-field"
                   />
                 </div>
@@ -1080,10 +1080,6 @@
                       type="checkbox"
                       id="chkManterCNPJ"
                       class="w-4 h-4 text-emerald-600 border-slate-400 rounded cursor-pointer nav-field"
-                      onchange="
-                        if (this.checked)
-                          document.getElementById('btnEnviarNota').focus();
-                      "
                     />
                     <label
                       for="chkManterCNPJ"
@@ -1985,6 +1981,6 @@
       </div>
     </div>
 
-    <script type="module" src="src/main.js"></script>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

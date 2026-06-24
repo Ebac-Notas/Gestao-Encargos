@@ -1,3 +1,4 @@
+import "./index.css";
 import { supabase } from "./supabaseClient.js";
 import { 
   parseMoney, 
@@ -302,6 +303,7 @@ export function limparFormulario(forceClearAll = false) {
   }
 
   if (forceClearAll || !chkManterCNPJ.checked) {
+    window.aliquotasValidas = null;
     iptCnpj.value = "";
     iptRazaoSocial.value = "";
     iptRazaoSocial.readOnly = false;
@@ -351,6 +353,7 @@ export function limparFormulario(forceClearAll = false) {
 window.limparFormulario = limparFormulario;
 
 export async function enviarNota() {
+  window.aliquotasValidas = null;
   const iptCondominio = getEl("iptCondominio");
   const iptCnpj = getEl("iptCnpj");
   const iptRazaoSocial = getEl("iptRazaoSocial");
@@ -598,7 +601,12 @@ export async function enviarNota() {
   limparFormulario(false);
 
   showToast("Nota fiscal lançada com sucesso!", "success");
-  if (chkManterCNPJ.checked) getEl("btnEnviarNota").focus();
+  // Ensure the cursor returns to the condominium field regardless of chkManterCNPJ
+  const iptCond = getEl("iptCondominio");
+  if (iptCond) {
+    iptCond.focus();
+    iptCond.select();
+  }
 }
 window.enviarNota = enviarNota;
 
@@ -816,7 +824,8 @@ export async function fazerLogout() {
   const txtSenha = getEl("txtSenha");
   if (txtSenha) txtSenha.value = "";
 
-  getEl("txtNomeUsuario").value = "";
+  const elTxtNomeUsuario = getEl("txtNomeUsuario");
+  if (elTxtNomeUsuario) elTxtNomeUsuario.value = "";
 
   const txtEmailCadastro = getEl("txtEmailCadastro");
   if (txtEmailCadastro) {
@@ -832,11 +841,15 @@ export async function fazerLogout() {
     txtEmailCadastro.placeholder = "roberto@empresa.com";
   }
 
-  getEl("txtNovaSenha").value = "";
-  getEl("txtConfirmarSenha").value = "";
+  const elTxtNovaSenha = getEl("txtNovaSenha");
+  if (elTxtNovaSenha) elTxtNovaSenha.value = "";
+  const elTxtConfirmarSenha = getEl("txtConfirmarSenha");
+  if (elTxtConfirmarSenha) elTxtConfirmarSenha.value = "";
 
-  getEl("tela-dashboard").classList.add("hidden");
-  getEl("tela-autenticacao").classList.remove("hidden");
+  const elTelaDashboard = getEl("tela-dashboard");
+  if (elTelaDashboard) elTelaDashboard.classList.add("hidden");
+  const elTelaAutenticacao = getEl("tela-autenticacao");
+  if (elTelaAutenticacao) elTelaAutenticacao.classList.remove("hidden");
 
   mostrarTelaLogin();
   showToast("Sessão encerrada.", "warning");
@@ -844,9 +857,11 @@ export async function fazerLogout() {
 window.fazerLogout = fazerLogout;
 
 export function syncReferencia(val) {
-  getEl("txtReferencia").value = val;
-  if (getEl("iptReferenciaInterna")) {
-    getEl("iptReferenciaInterna").value = val;
+  const elTxtReferencia = getEl("txtReferencia");
+  if (elTxtReferencia) elTxtReferencia.value = val;
+  const elIptReferenciaInterna = getEl("iptReferenciaInterna");
+  if (elIptReferenciaInterna) {
+    elIptReferenciaInterna.value = val;
   }
   renderNotas(true);
   renderAuditoria(true);
@@ -2080,9 +2095,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const now = new Date();
   const anoStr = now.getFullYear();
   const mesStr = String(now.getMonth() + 1).padStart(2, "0");
-  getEl("txtReferencia").value = `${anoStr}-${mesStr}`;
-  if (getEl("iptReferenciaInterna")) {
-    getEl("iptReferenciaInterna").value = `${anoStr}-${mesStr}`;
+  const elTxtReferencia = getEl("txtReferencia");
+  if (elTxtReferencia) {
+    elTxtReferencia.value = `${anoStr}-${mesStr}`;
+  }
+  const elIptReferenciaInterna = getEl("iptReferenciaInterna");
+  if (elIptReferenciaInterna) {
+    elIptReferenciaInterna.value = `${anoStr}-${mesStr}`;
   }
 
   const iptValorBruto = getEl("iptValorBruto");
@@ -2106,17 +2125,32 @@ window.addEventListener("DOMContentLoaded", () => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       const tabLancar = getEl("tab-lancar");
       if (tabLancar && !tabLancar.classList.contains("hidden")) {
-        const cond = getEl("iptCondominio").value.trim();
-        const cnpj = getEl("iptCnpj").value.trim();
-        const nota = getEl("iptNota").value.trim();
-        const dia = getEl("iptDiaEmissao").value.trim();
-        const bruto = parseFloat(getEl("iptValorBruto").value) || 0;
+        const elCond = getEl("iptCondominio");
+        const elCnpj = getEl("iptCnpj");
+        const elNota = getEl("iptNota");
+        const elDia = getEl("iptDiaEmissao");
+        const elBruto = getEl("iptValorBruto");
+        const elIss = getEl("iptISS");
+        const elInss = getEl("iptINSS");
+        const elIr = getEl("iptIR");
+        const elChkPis = getEl("chkPis");
+        const elPisVal = getEl("iptPisVal");
 
-        const iss = parseFloat(getEl("iptISS").value) || 0;
-        const inss = parseFloat(getEl("iptINSS").value) || 0;
-        const ir = parseFloat(getEl("iptIR").value) || 0;
-        const chkPis = getEl("chkPis").checked;
-        const pisVal = chkPis ? parseFloat(getEl("iptPisVal").value) || 0 : 0;
+        if (!elCond || !elCnpj || !elNota || !elDia || !elBruto || !elIss || !elInss || !elIr || !elChkPis || !elPisVal) {
+          return;
+        }
+
+        const cond = elCond.value.trim();
+        const cnpj = elCnpj.value.trim();
+        const nota = elNota.value.trim();
+        const dia = elDia.value.trim();
+        const bruto = parseFloat(elBruto.value) || 0;
+
+        const iss = parseFloat(elIss.value) || 0;
+        const inss = parseFloat(elInss.value) || 0;
+        const ir = parseFloat(elIr.value) || 0;
+        const chkPis = elChkPis.checked;
+        const pisVal = chkPis ? parseFloat(elPisVal.value) || 0 : 0;
 
         const temEncargo = iss > 0 || inss > 0 || ir > 0 || pisVal > 0;
 
@@ -2207,8 +2241,9 @@ window.addEventListener("DOMContentLoaded", () => {
     iptNota.addEventListener("blur", function () {
       this.value = this.value.replace(/^0+/, "");
       let numNota = this.value.trim();
-      let cnpj = iptCnpj.value;
-      let refSelecionada = getEl("txtReferencia").value;
+      let cnpj = iptCnpj ? iptCnpj.value : "";
+      const refEl = getEl("txtReferencia");
+      let refSelecionada = refEl ? refEl.value : "";
 
       if (numNota && cnpj && refSelecionada) {
         let isDupe = window.dbNotas.some((n) => {
@@ -2222,7 +2257,9 @@ window.addEventListener("DOMContentLoaded", () => {
         if (isDupe) {
           showToast(`ATENÇÃO: Nota fiscal nº ${numNota} já cadastrada para esta Empresa/Emitente (CNPJ: ${mascararCNPJ(cnpj)})!`, "error");
           const form = getEl("formLancarNota");
-          form.classList.add("ring-4", "ring-red-500", "transition-all", "duration-200");
+          if (form) {
+            form.classList.add("ring-4", "ring-red-500", "transition-all", "duration-200");
+          }
 
           try {
             let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2240,7 +2277,9 @@ window.addEventListener("DOMContentLoaded", () => {
           } catch (e) {}
 
           setTimeout(() => {
-            form.classList.remove("ring-4", "ring-red-500");
+            if (form) {
+              form.classList.remove("ring-4", "ring-red-500");
+            }
             limparFormulario(true);
           }, 2000);
         }
@@ -2254,7 +2293,7 @@ window.addEventListener("DOMContentLoaded", () => {
       let val = this.value.toUpperCase();
       this.value = val;
       const lblCondHeader = getEl("lblHeaderCondominio");
-      if (val.length < 3) {
+      if (lblCondHeader && val.length < 3) {
         lblCondHeader.innerText = "AGUARDANDO CONDOMÍNIO...";
         lblCondHeader.className = "text-xl font-black text-slate-800 uppercase tracking-wide";
       }
@@ -2269,7 +2308,7 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const lblCondHeader = getEl("lblHeaderCondominio");
-      lblCondHeader.innerText = "BUSCANDO NO BANCO...";
+      if (lblCondHeader) lblCondHeader.innerText = "BUSCANDO NO BANCO...";
 
       try {
         const { data, error } = await supabase
@@ -2278,19 +2317,37 @@ window.addEventListener("DOMContentLoaded", () => {
           .eq("codigo", val)
           .maybeSingle();
         if (data) {
-          lblCondHeader.innerText = data.razao_social;
-          lblCondHeader.className = "text-xl font-black text-emerald-700 uppercase tracking-wide";
-          setTimeout(() => iptCnpj.focus(), 10);
+          if (lblCondHeader) {
+            lblCondHeader.innerText = data.razao_social;
+            lblCondHeader.className = "text-xl font-black text-emerald-700 uppercase tracking-wide";
+          }
+          
+          const chkManterCNPJ = getEl("chkManterCNPJ");
+          const iptCnpj = getEl("iptCnpj");
+          const iptRazaoSocial = getEl("iptRazaoSocial");
+          if (chkManterCNPJ && chkManterCNPJ.checked && iptCnpj && iptCnpj.value.trim() && iptRazaoSocial && iptRazaoSocial.value.trim()) {
+            setTimeout(() => {
+              const iptNota = getEl("iptNota");
+              if (iptNota) {
+                iptNota.focus();
+                iptNota.select();
+              }
+            }, 10);
+          } else {
+            setTimeout(() => { if (iptCnpj) iptCnpj.focus(); }, 10);
+          }
         } else {
           showToast("Código do condomínio não encontrado.", "error");
           this.value = "";
-          lblCondHeader.innerText = "CÓDIGO INEXISTENTE";
-          lblCondHeader.className = "text-xl font-black text-red-600 uppercase tracking-wide";
-          setTimeout(() => iptCondominio.focus(), 10);
+          if (lblCondHeader) {
+            lblCondHeader.innerText = "CÓDIGO INEXISTENTE";
+            lblCondHeader.className = "text-xl font-black text-red-600 uppercase tracking-wide";
+          }
+          setTimeout(() => { if (iptCondominio) iptCondominio.focus(); }, 10);
         }
       } catch (e) {
         console.error(e);
-        lblCondHeader.innerText = "ERRO DE CONEXÃO";
+        if (lblCondHeader) lblCondHeader.innerText = "ERRO DE CONEXÃO";
       }
     });
   }
@@ -2432,10 +2489,40 @@ window.addEventListener("DOMContentLoaded", () => {
         if (currentIndex !== -1) {
           e.preventDefault();
           let targetEl = null;
+
+          const chkManter = getEl("chkManterCNPJ");
+          const iptCnpj = getEl("iptCnpj");
+          const iptRazaoSocial = getEl("iptRazaoSocial");
+          const hasKeepCnpj = chkManter && chkManter.checked && iptCnpj && iptCnpj.value.trim() && iptRazaoSocial && iptRazaoSocial.value.trim();
+
           if (e.shiftKey) {
-            targetEl = visibleElements[currentIndex - 1] || visibleElements[visibleElements.length - 1];
+            let prevIdx = currentIndex - 1;
+            while (prevIdx >= 0) {
+              const candidate = visibleElements[prevIdx];
+              if (hasKeepCnpj && (candidate.id === "iptCnpj" || candidate.id === "iptRazaoSocial")) {
+                prevIdx--;
+                continue;
+              }
+              targetEl = candidate;
+              break;
+            }
+            if (!targetEl) {
+              targetEl = visibleElements[visibleElements.length - 1];
+            }
           } else {
-            targetEl = visibleElements[currentIndex + 1] || visibleElements[0];
+            let nextIdx = currentIndex + 1;
+            while (nextIdx < visibleElements.length) {
+              const candidate = visibleElements[nextIdx];
+              if (hasKeepCnpj && (candidate.id === "iptCnpj" || candidate.id === "iptRazaoSocial")) {
+                nextIdx++;
+                continue;
+              }
+              targetEl = candidate;
+              break;
+            }
+            if (!targetEl) {
+              targetEl = visibleElements[0];
+            }
           }
 
           if (targetEl) {
@@ -2459,11 +2546,20 @@ window.addEventListener("DOMContentLoaded", () => {
         if (currentIndex !== -1) {
           let nextIdx = currentIndex + 1;
           let targetEl = null;
+
+          const chkManter = getEl("chkManterCNPJ");
+          const iptCnpj = getEl("iptCnpj");
+          const iptRazaoSocial = getEl("iptRazaoSocial");
+          const hasKeepCnpj = chkManter && chkManter.checked && iptCnpj && iptCnpj.value.trim() && iptRazaoSocial && iptRazaoSocial.value.trim();
           
           while (nextIdx < visibleElements.length) {
             const candidate = visibleElements[nextIdx];
             if (candidate.tagName === "INPUT" && candidate.type !== "checkbox" && candidate.type !== "radio") {
               if (candidate.id === "iptRazaoSocial" && candidate.readOnly) {
+                nextIdx++;
+                continue;
+              }
+              if (hasKeepCnpj && (candidate.id === "iptCnpj" || candidate.id === "iptRazaoSocial")) {
                 nextIdx++;
                 continue;
               }
@@ -2479,6 +2575,10 @@ window.addEventListener("DOMContentLoaded", () => {
               const candidate = visibleElements[nextIdx];
               if (candidate.tagName === "INPUT" && candidate.type !== "checkbox" && candidate.type !== "radio") {
                 if (candidate.id === "iptRazaoSocial" && candidate.readOnly) {
+                  nextIdx++;
+                  continue;
+                }
+                if (hasKeepCnpj && (candidate.id === "iptCnpj" || candidate.id === "iptRazaoSocial")) {
                   nextIdx++;
                   continue;
                 }
@@ -2550,14 +2650,22 @@ window.addEventListener("DOMContentLoaded", () => {
         ).map((e) => ({ cnpj: e.cnpj, nome: e.razao_social }));
         renderAutocompleteCnpj(filtrados);
       } else {
-        listaCnpj.classList.add("hidden");
-        iptRazaoSocial.value = "";
-        iptRazaoSocial.readOnly = false;
-        iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
-        lblRazaoSocial.innerText = "Razão Social";
-        lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
-        getEl("boxNovaEmpresa").classList.add("hidden");
-        getEl("boxNovaEmpresa").classList.remove("flex");
+        window.aliquotasValidas = null;
+        if (listaCnpj) listaCnpj.classList.add("hidden");
+        if (iptRazaoSocial) {
+          iptRazaoSocial.value = "";
+          iptRazaoSocial.readOnly = false;
+          iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
+        }
+        if (lblRazaoSocial) {
+          lblRazaoSocial.innerText = "Razão Social";
+          lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+        }
+        const boxNovaEmpresa = getEl("boxNovaEmpresa");
+        if (boxNovaEmpresa) {
+          boxNovaEmpresa.classList.add("hidden");
+          boxNovaEmpresa.classList.remove("flex");
+        }
       }
     });
 
@@ -2567,26 +2675,41 @@ window.addEventListener("DOMContentLoaded", () => {
           window.cnpjJaProcessadoTeclado = false;
           return;
         }
-        if (!listaCnpj.classList.contains("hidden")) {
+        if (listaCnpj && !listaCnpj.classList.contains("hidden")) {
           listaCnpj.classList.add("hidden");
-          iptRazaoSocial.value = "";
-          iptRazaoSocial.readOnly = false;
-          iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
-          lblRazaoSocial.innerText = "Razão Social";
-          lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
-          getEl("boxNovaEmpresa").classList.add("hidden");
-          getEl("boxNovaEmpresa").classList.remove("flex");
+          if (iptRazaoSocial) {
+            iptRazaoSocial.value = "";
+            iptRazaoSocial.readOnly = false;
+            iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
+          }
+          if (lblRazaoSocial) {
+            lblRazaoSocial.innerText = "Razão Social";
+            lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+          }
+          const boxNovaEmpresa = getEl("boxNovaEmpresa");
+          if (boxNovaEmpresa) {
+            boxNovaEmpresa.classList.add("hidden");
+            boxNovaEmpresa.classList.remove("flex");
+          }
         }
 
         let raw = iptCnpj.value.replace(/[^\d]+/g, "");
         if (!raw) {
-          iptRazaoSocial.value = "";
-          iptRazaoSocial.readOnly = false;
-          iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
-          lblRazaoSocial.innerText = "Razão Social";
-          lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
-          getEl("boxNovaEmpresa").classList.add("hidden");
-          getEl("boxNovaEmpresa").classList.remove("flex");
+          window.aliquotasValidas = null;
+          if (iptRazaoSocial) {
+            iptRazaoSocial.value = "";
+            iptRazaoSocial.readOnly = false;
+            iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
+          }
+          if (lblRazaoSocial) {
+            lblRazaoSocial.innerText = "Razão Social";
+            lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+          }
+          const boxNovaEmpresa = getEl("boxNovaEmpresa");
+          if (boxNovaEmpresa) {
+            boxNovaEmpresa.classList.add("hidden");
+            boxNovaEmpresa.classList.remove("flex");
+          }
           return;
         }
 
@@ -2596,6 +2719,7 @@ window.addEventListener("DOMContentLoaded", () => {
         }
 
         if (!validarCNPJ(iptCnpj.value)) {
+          window.aliquotasValidas = null;
           showToast("CNPJ inválido!", "error");
           iptCnpj.value = "";
           iptRazaoSocial.value = "";
@@ -2627,6 +2751,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           carregarSmartDefaults(raw);
         } else {
+          window.aliquotasValidas = null;
           iptRazaoSocial.value = "";
           iptRazaoSocial.readOnly = false;
           iptRazaoSocial.placeholder = "Digite o nome da empresa...";
@@ -2824,13 +2949,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
       if (window.aliquotasValidas) {
         if (window.aliquotasValidas.iss !== undefined) {
-          getEl("iptISS").value = (bruto * window.aliquotasValidas.iss).toFixed(2);
+          const elIss = getEl("iptISS");
+          if (elIss) elIss.value = (bruto * window.aliquotasValidas.iss).toFixed(2);
         }
         if (window.aliquotasValidas.inss !== undefined) {
-          getEl("iptINSS").value = (bruto * window.aliquotasValidas.inss).toFixed(2);
+          const elInss = getEl("iptINSS");
+          if (elInss) elInss.value = (bruto * window.aliquotasValidas.inss).toFixed(2);
         }
         if (window.aliquotasValidas.ir !== undefined) {
-          getEl("iptIR").value = (bruto * window.aliquotasValidas.ir).toFixed(2);
+          const elIr = getEl("iptIR");
+          if (elIr) elIr.value = (bruto * window.aliquotasValidas.ir).toFixed(2);
         }
       }
 

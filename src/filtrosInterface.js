@@ -377,10 +377,15 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
   }
 
   // Apply Encargos Filter
-  const fltISS = document.getElementById("fltISS").checked;
-  const fltINSS = document.getElementById("fltINSS").checked;
-  const fltIR = document.getElementById("fltIR").checked;
-  const fltPIS = document.getElementById("fltPIS").checked;
+  const elFltISS = document.getElementById("fltISS");
+  const elFltINSS = document.getElementById("fltINSS");
+  const elFltIR = document.getElementById("fltIR");
+  const elFltPIS = document.getElementById("fltPIS");
+
+  const fltISS = elFltISS ? elFltISS.checked : false;
+  const fltINSS = elFltINSS ? elFltINSS.checked : false;
+  const fltIR = elFltIR ? elFltIR.checked : false;
+  const fltPIS = elFltPIS ? elFltPIS.checked : false;
   const fltOutroEl = document.getElementById("fltOutroMunicipio");
   const fltOutro = fltOutroEl ? fltOutroEl.checked : false;
 
@@ -714,8 +719,10 @@ export async function renderAuditoria(fetchFirst = true) {
       });
     }
   } else if (periodType === "custom") {
-    const dateIniStr = document.getElementById("fltLogDataIni").value; // 'YYYY-MM-DD'
-    const dateFimStr = document.getElementById("fltLogDataFim").value; // 'YYYY-MM-DD'
+    const elDateIni = document.getElementById("fltLogDataIni");
+    const elDateFim = document.getElementById("fltLogDataFim");
+    const dateIniStr = elDateIni ? elDateIni.value : "";
+    const dateFimStr = elDateFim ? elDateFim.value : "";
 
     let dIni = dateIniStr ? new Date(dateIniStr + "T00:00:00") : null;
     let dFim = dateFimStr ? new Date(dateFimStr + "T23:59:59") : null;
