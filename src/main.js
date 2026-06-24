@@ -638,6 +638,50 @@ export function alterarAba(tabId) {
     botaoAtual.classList.remove("aba-inativa");
     botaoAtual.classList.add("aba-ativa");
   }
+
+  if (tabId === "tab-lancar") {
+    const camposTexto = [
+      "iptCondominio",
+      "iptCnpj",
+      "iptRazaoSocial",
+      "iptNota",
+      "iptDiaEmissao",
+      "iptValorBruto",
+      "iptISS",
+      "iptINSS",
+      "iptIR",
+      "iptPisVal",
+      "iptPIS",
+      "iptCOFINS",
+      "iptCSLL",
+      "iptCodServico"
+    ];
+    let algumPreenchido = false;
+    for (const id of camposTexto) {
+      const el = getEl(id);
+      if (el && el.value && el.value.trim() !== "") {
+        algumPreenchido = true;
+        break;
+      }
+    }
+    const chkPis = getEl("chkPis");
+    if (chkPis && chkPis.checked) {
+      algumPreenchido = true;
+    }
+    const chkOutros = getEl("chkOutrosMunicipios");
+    if (chkOutros && chkOutros.checked) {
+      algumPreenchido = true;
+    }
+
+    if (!algumPreenchido) {
+      const iptCondo = getEl("iptCondominio");
+      if (iptCondo) {
+        setTimeout(() => {
+          iptCondo.focus();
+        }, 50);
+      }
+    }
+  }
 }
 window.alterarAba = alterarAba;
 
