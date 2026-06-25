@@ -2539,7 +2539,9 @@ window.addEventListener("DOMContentLoaded", () => {
           }
 
           if (window.verificarCnpjCondominio) {
-            window.verificarCnpjCondominio(el.value);
+            if (window.verificarCnpjCondominio(el.value)) {
+              return;
+            }
           }
 
           let emp = window.dbEmpresas.find(x => String(x.cnpj) === raw);
@@ -2833,7 +2835,9 @@ window.addEventListener("DOMContentLoaded", () => {
         }
 
         if (window.verificarCnpjCondominio) {
-          window.verificarCnpjCondominio(iptCnpj.value);
+          if (window.verificarCnpjCondominio(iptCnpj.value)) {
+            return;
+          }
         }
 
         let emp = null;
@@ -2992,6 +2996,11 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   window.selecionarNome = (cnpj, nome) => {
+    if (window.verificarCnpjCondominio) {
+      if (window.verificarCnpjCondominio(cnpj)) {
+        return;
+      }
+    }
     iptCnpj.value = mascararCNPJ(cnpj);
     listaNome.classList.add("hidden");
 
@@ -3004,13 +3013,15 @@ window.addEventListener("DOMContentLoaded", () => {
     getEl("boxNovaEmpresa").classList.remove("flex");
 
     carregarSmartDefaults(cnpj);
-    if (window.verificarCnpjCondominio) {
-      window.verificarCnpjCondominio(cnpj);
-    }
     setTimeout(() => getEl("iptNota").focus(), 10);
   };
 
   window.selecionarCnpj = (cnpj, nome) => {
+    if (window.verificarCnpjCondominio) {
+      if (window.verificarCnpjCondominio(cnpj)) {
+        return;
+      }
+    }
     iptCnpj.value = mascararCNPJ(cnpj);
     listaCnpj.classList.add("hidden");
 
@@ -3023,9 +3034,6 @@ window.addEventListener("DOMContentLoaded", () => {
     getEl("boxNovaEmpresa").classList.remove("flex");
 
     carregarSmartDefaults(cnpj);
-    if (window.verificarCnpjCondominio) {
-      window.verificarCnpjCondominio(cnpj);
-    }
     setTimeout(() => getEl("iptNota").focus(), 10);
   };
 
@@ -3111,22 +3119,39 @@ window.addEventListener("DOMContentLoaded", () => {
   }, true);
 
   const verificarCnpjCondominio = (cnpjInput) => {
-    if (!cnpjInput) return;
+    if (!cnpjInput) return false;
     const rawCnpj = cnpjInput.replace(/[^\d]+/g, "");
-    if (!rawCnpj) return;
+    if (!rawCnpj) return false;
 
     const iptCondominio = getEl("iptCondominio");
-    if (!iptCondominio) return;
+    if (!iptCondominio) return false;
     const codCond = iptCondominio.value.trim().toUpperCase();
-    if (!codCond) return;
+    if (!codCond) return false;
 
     const cond = (window.dbCondominios || []).find(c => c.codigo === codCond);
     if (cond && cond.cnpj) {
       const condCnpjRaw = cond.cnpj.replace(/[^\d]+/g, "");
       if (rawCnpj === condCnpjRaw) {
         showToast("Atenção: O CNPJ inserido é o do próprio Condomínio!", "warning");
+        const iptCnpj = getEl("iptCnpj");
+        if (iptCnpj) {
+          iptCnpj.value = "";
+          const iptRazaoSocial = getEl("iptRazaoSocial");
+          if (iptRazaoSocial) iptRazaoSocial.value = "";
+          const boxNovaEmpresa = getEl("boxNovaEmpresa");
+          if (boxNovaEmpresa) {
+            boxNovaEmpresa.classList.add("hidden");
+            boxNovaEmpresa.classList.remove("flex");
+          }
+          iptCnpj.classList.add("flash-red");
+          setTimeout(() => {
+            iptCnpj.classList.remove("flash-red");
+          }, 3000);
+        }
+        return true;
       }
     }
+    return false;
   };
   window.verificarCnpjCondominio = verificarCnpjCondominio;
 
