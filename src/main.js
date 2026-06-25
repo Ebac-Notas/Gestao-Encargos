@@ -37,6 +37,7 @@ window.notasDoMes = [];
 window.dbAuditoria = [];
 window.modoConferencia = false;
 window.isBatchUpdating = false;
+window.isSendingNota = false;
 window.paginaAtualNotas = 1;
 window.itensPorPaginaNotas = 50;
 window.notasFiltradasAtivas = [];
@@ -360,7 +361,11 @@ export function limparFormulario(forceClearAll = false) {
 window.limparFormulario = limparFormulario;
 
 export async function enviarNota() {
-  const iptCondominio = getEl("iptCondominio");
+  if (window.isSendingNota) return;
+  window.isSendingNota = true;
+
+  try {
+    const iptCondominio = getEl("iptCondominio");
   const iptCnpj = getEl("iptCnpj");
   const iptRazaoSocial = getEl("iptRazaoSocial");
   const iptNota = getEl("iptNota");
@@ -612,6 +617,9 @@ export async function enviarNota() {
   if (iptCond) {
     iptCond.focus();
     iptCond.select();
+  }
+  } finally {
+    window.isSendingNota = false;
   }
 }
 window.enviarNota = enviarNota;
