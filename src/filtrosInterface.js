@@ -96,6 +96,7 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
         window.dbCondominios = data.map((c) => ({
           codigo: c.codigo,
           nome: c.razao_social,
+          cnpj: c.cnpj,
         }));
       }
     }
@@ -596,10 +597,15 @@ export async function renderCondominios(fetchFirst = true) {
   }
 
   arr.forEach((c) => {
+    let formattedCnpj = "";
+    if (c.cnpj) {
+      formattedCnpj = window.mascararCNPJ ? window.mascararCNPJ(c.cnpj) : c.cnpj;
+    }
     grid.innerHTML += `
       <tr class="hover:bg-blue-50 border-b border-slate-200 cursor-pointer" ondblclick="window.startEditRow('cond', '${c.codigo}', this, event)">
         <td class="p-3 font-mono font-black text-center text-slate-700 bg-slate-50 border-r border-slate-200 editable-cell" data-prop="codigo">${c.codigo}</td>
         <td class="p-3 font-bold text-slate-800 text-xs editable-cell" data-prop="nome">${c.nome}</td>
+        <td class="p-3 font-mono text-center text-slate-700 text-xs editable-cell border-l border-r border-slate-200" data-prop="cnpj">${formattedCnpj}</td>
         <td class="p-3 text-center">
            <button onclick="window.handleAcaoRow('cond', '${c.codigo}', this)" class="btn-acao p-1 rounded text-red-600 hover:bg-red-50 focus:outline-none transition-colors" title="Excluir">
              <span class="material-symbols-outlined text-[16px]">delete</span>
