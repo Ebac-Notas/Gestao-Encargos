@@ -1573,9 +1573,17 @@ export function handleAcaoRow(gridName, id, btnObj) {
               showToast("Cód. Condominio inválido.", "error");
               return;
             }
+            let cleanNewCnpj = String(props.cnpj || "").replace(/[^\d]+/g, "").padStart(14, "0");
+            if (props.cnpj && props.cnpj.trim() !== "" && !validarCNPJ(props.cnpj)) {
+              showToast("CNPJ inválido.", "error");
+              return;
+            }
             await supabase
               .from("condominios")
-              .update({ razao_social: titleCase(props.nome) })
+              .update({ 
+                razao_social: titleCase(props.nome), 
+                cnpj: cleanNewCnpj || null 
+              })
               .eq("codigo", id);
 
             let oper = getOperador();
@@ -1729,6 +1737,8 @@ window.applyMaskToContentEditable = applyMaskToContentEditable;
 export function salvarNovoCondominio() {
   let cod = getEl("novaCodCond").value.trim().toUpperCase();
   let nome = titleCase(getEl("novoNomeCond").value.trim());
+  let cnpjInput = getEl("novoCnpjCond") ? getEl("novoCnpjCond").value.trim() : "";
+  let cnpjLimpo = cnpjInput.replace(/[^\d]+/g, "").padStart(14, "0");
 
   if (cod.length !== 3) {
     showToast("Código deve ter 3 dígitos.", "error");
@@ -1738,40 +1748,72 @@ export function salvarNovoCondominio() {
     showToast("Nome é obrigatório.", "error");
     return;
   }
-
-  if (window.dbCondominios.some((c) => c.codigo === cod)) {
-    showToast("Código já cadastrado.", "error");
+  if (cnpjInput && !validarCNPJ(cnpjInput)) {
+    showToast("CNPJ inválido.", "error");
     return;
   }
 
+  let existente = window.dbCondominios.find((c) => c.codigo === cod);
+
   (async () => {
     try {
-      const { error } = await supabase
-        .from("condominios")
-        .insert([{ codigo: cod, razao_social: nome }]);
-      if (error) {
-        showToast("Erro ao gravar: " + error.message, "error");
-        return;
+      if (existente) {
+        const { error } = await supabase
+          .from("condominios")
+          .update({ razao_social: nome, cnpj: cnpjLimpo || null })
+          .eq("codigo", cod);
+
+        if (error) {
+          showToast("Erro ao atualizar condomínio: " + error.message, "error");
+          return;
+        }
+
+        let oper = getOperador();
+        await supabase.from("logs_auditoria").insert([
+          {
+            operador: oper,
+            acao: "UPDATE_CONDOMINIO",
+            entidade: cod,
+            recurso: nome,
+            descricao: `Condomínio atualizado via formulário de cadastro (com CNPJ)`,
+            referencia: getEl("txtReferencia").value,
+          },
+        ]);
+
+        showToast("Condomínio atualizado com sucesso.", "success");
+      } else {
+        const { error } = await supabase
+          .from("condominios")
+          .insert([{ codigo: cod, razao_social: nome, cnpj: cnpjLimpo || null }]);
+
+        if (error) {
+          showToast("Erro ao gravar: " + error.message, "error");
+          return;
+        }
+
+        let oper = getOperador();
+        await supabase.from("logs_auditoria").insert([
+          {
+            operador: oper,
+            acao: "ADD_CONDOMINIO",
+            entidade: cod,
+            recurso: nome,
+            descricao: `Novo condomínio adicionado manualmente (com CNPJ)`,
+            referencia: getEl("txtReferencia").value,
+          },
+        ]);
+
+        showToast("Condomínio adicionado com sucesso.", "success");
       }
-      let oper = getOperador();
-      await supabase.from("logs_auditoria").insert([
-        {
-          operador: oper,
-          acao: "ADD_CONDOMINIO",
-          entidade: cod,
-          recurso: nome,
-          descricao: `Novo condomínio adicionado manualmente`,
-          referencia: getEl("txtReferencia").value,
-        },
-      ]);
-      showToast("Condomínio adicionado com sucesso.", "success");
+
       getEl("modalNovoCond").classList.add("hidden");
       getEl("novaCodCond").value = "";
       getEl("novoNomeCond").value = "";
+      if (getEl("novoCnpjCond")) getEl("novoCnpjCond").value = "";
       renderCondominios(true);
     } catch (e) {
       console.error(e);
-      showToast("Erro ao criar condomínio.", "error");
+      showToast("Erro ao processar condomínio.", "error");
     }
   })();
 }
@@ -1791,6 +1833,13 @@ export function processarLoteCondominio() {
     if (partes.length >= 2) {
       let cod = partes[0].trim().toUpperCase();
       let nome = titleCase(partes[1].trim());
+      let cnpjLimpo = null;
+      if (partes.length >= 3) {
+        let rawCnpj = partes[2].trim().replace(/[^\d]+/g, "");
+        if (rawCnpj) {
+          cnpjLimpo = rawCnpj.padStart(14, "0");
+        }
+      }
       if (cod.length === 3 && nome) {
         let existente = window.dbCondominios.find((c) => c.codigo === cod);
         if (existente) {
@@ -1798,7 +1847,7 @@ export function processarLoteCondominio() {
         } else {
           inseridos++;
         }
-        itemsToUpsert.push({ codigo: cod, razao_social: nome });
+        itemsToUpsert.push({ codigo: cod, razao_social: nome, cnpj: cnpjLimpo });
       }
     }
   });
@@ -1824,7 +1873,7 @@ export function processarLoteCondominio() {
           acao: "BATCH_CONDOMINIO",
           entidade: `${itemsToUpsert.length} Condomínios`,
           recurso: "",
-          descricao: `Importação em lote de ${itemsToUpsert.length} condomínios`,
+          descricao: `Importação em lote de ${itemsToUpsert.length} condomínios com CNPJ`,
           referencia: getEl("txtReferencia").value,
         },
       ]);
@@ -2489,6 +2538,10 @@ window.addEventListener("DOMContentLoaded", () => {
             return;
           }
 
+          if (window.verificarCnpjCondominio) {
+            window.verificarCnpjCondominio(el.value);
+          }
+
           let emp = window.dbEmpresas.find(x => String(x.cnpj) === raw);
           const iptRazaoSocial = getEl("iptRazaoSocial");
           const lblRazaoSocial = getEl("lblRazaoSocial");
@@ -2779,6 +2832,10 @@ window.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
+        if (window.verificarCnpjCondominio) {
+          window.verificarCnpjCondominio(iptCnpj.value);
+        }
+
         let emp = null;
         try {
           const { data } = await supabase
@@ -2947,6 +3004,9 @@ window.addEventListener("DOMContentLoaded", () => {
     getEl("boxNovaEmpresa").classList.remove("flex");
 
     carregarSmartDefaults(cnpj);
+    if (window.verificarCnpjCondominio) {
+      window.verificarCnpjCondominio(cnpj);
+    }
     setTimeout(() => getEl("iptNota").focus(), 10);
   };
 
@@ -2963,6 +3023,9 @@ window.addEventListener("DOMContentLoaded", () => {
     getEl("boxNovaEmpresa").classList.remove("flex");
 
     carregarSmartDefaults(cnpj);
+    if (window.verificarCnpjCondominio) {
+      window.verificarCnpjCondominio(cnpj);
+    }
     setTimeout(() => getEl("iptNota").focus(), 10);
   };
 
@@ -3047,9 +3110,36 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }, true);
 
+  const verificarCnpjCondominio = (cnpjInput) => {
+    if (!cnpjInput) return;
+    const rawCnpj = cnpjInput.replace(/[^\d]+/g, "");
+    if (!rawCnpj) return;
+
+    const iptCondominio = getEl("iptCondominio");
+    if (!iptCondominio) return;
+    const codCond = iptCondominio.value.trim().toUpperCase();
+    if (!codCond) return;
+
+    const cond = (window.dbCondominios || []).find(c => c.codigo === codCond);
+    if (cond && cond.cnpj) {
+      const condCnpjRaw = cond.cnpj.replace(/[^\d]+/g, "");
+      if (rawCnpj === condCnpjRaw) {
+        showToast("Atenção: O CNPJ inserido é o do próprio Condomínio!", "warning");
+      }
+    }
+  };
+  window.verificarCnpjCondominio = verificarCnpjCondominio;
+
   const novaCnpjEmp = getEl("novaCnpjEmp");
   if (novaCnpjEmp) {
     novaCnpjEmp.addEventListener("input", function () {
+      this.value = mascararCNPJ(this.value);
+    });
+  }
+
+  const novoCnpjCond = getEl("novoCnpjCond");
+  if (novoCnpjCond) {
+    novoCnpjCond.addEventListener("input", function () {
       this.value = mascararCNPJ(this.value);
     });
   }
