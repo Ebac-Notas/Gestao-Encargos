@@ -1278,6 +1278,12 @@
                       Nome de Faturamento
                       <span class="text-[10px] opacity-70">↕</span>
                     </th>
+                    <th
+                      class="p-3 w-44 text-center font-bold border-l border-r border-slate-300 cursor-pointer hover:bg-slate-300"
+                      onclick="sortGrid('cond', 'cnpj')"
+                    >
+                      CNPJ <span class="text-[10px] opacity-70">↕</span>
+                    </th>
                     <th class="p-3 w-16 text-center font-bold">Ações</th>
                   </tr>
                 </thead>
@@ -1901,6 +1907,17 @@
               class="border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-emerald-500 font-bold"
             />
           </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] font-bold text-slate-700 uppercase"
+              >CNPJ do Condomínio</label
+            >
+            <input
+              type="text"
+              id="novoCnpjCond"
+              placeholder="00.000.000/0000-00"
+              class="border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-emerald-500 font-mono"
+            />
+          </div>
         </div>
         <div
           class="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end gap-2"
@@ -1946,15 +1963,16 @@
         </div>
         <div class="p-4 flex flex-col gap-3">
           <p class="text-xs text-slate-600">
-            Cole abaixo as duas colunas do Excel:
-            <strong>CÓDIGO (3 dígitos)</strong> e
-            <strong>NOME DO CONDOMÍNIO</strong>.
+            Cole abaixo as três colunas do Excel:
+            <strong>CÓDIGO (3 dígitos)</strong>,
+            <strong>NOME DO CONDOMÍNIO</strong> e
+            <strong>CNPJ</strong>.
           </p>
           <textarea
             id="txtLoteCond"
             class="w-full h-48 border border-slate-300 rounded p-3 text-sm focus:outline-none focus:border-blue-500 font-mono text-slate-700 leading-relaxed"
-            placeholder="001	Condomínio A
-002	Condomínio B..."
+            placeholder="001	Condomínio A	12.345.678/0001-90
+002	Condomínio B	98.765.432/0001-10..."
           ></textarea>
         </div>
         <div
