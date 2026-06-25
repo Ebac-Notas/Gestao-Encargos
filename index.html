@@ -132,6 +132,13 @@
         opacity: 0 !important;
         cursor: pointer !important;
       }
+      @keyframes flashRedBorder {
+        0%, 100% { border-color: #cbd5e1; box-shadow: none; }
+        50% { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4); }
+      }
+      .flash-red {
+        animation: flashRedBorder 0.5s ease-in-out infinite !important;
+      }
     </style>
   </head>
   <body class="bg-slate-100 flex flex-col h-full overflow-hidden text-sm">
