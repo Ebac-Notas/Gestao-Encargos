@@ -317,6 +317,13 @@ export function limparFormulario(forceClearAll = false) {
 
     iptCondominio.focus();
   } else {
+    // Keep CNPJ, but reload smart defaults to match the kept CNPJ (including any note just saved!)
+    if (iptCnpj && iptCnpj.value) {
+      const rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "");
+      if (rawCnpj) {
+        carregarSmartDefaults(rawCnpj);
+      }
+    }
     iptCondominio.focus();
   }
 
@@ -353,7 +360,6 @@ export function limparFormulario(forceClearAll = false) {
 window.limparFormulario = limparFormulario;
 
 export async function enviarNota() {
-  window.aliquotasValidas = null;
   const iptCondominio = getEl("iptCondominio");
   const iptCnpj = getEl("iptCnpj");
   const iptRazaoSocial = getEl("iptRazaoSocial");
