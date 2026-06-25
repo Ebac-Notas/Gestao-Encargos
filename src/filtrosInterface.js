@@ -48,7 +48,7 @@ export function showToast(message, type = "info") {
     toast.classList.remove("opacity-100", "translate-y-0");
     toast.classList.add("opacity-0", "translate-y-2");
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, 5000);
 }
 
 // --- SORTS & DATA STATES ---
