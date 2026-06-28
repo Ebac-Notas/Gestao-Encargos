@@ -38,6 +38,11 @@ window.dbAuditoria = [];
 window.modoConferencia = false;
 window.isBatchUpdating = false;
 window.isSendingNota = false;
+window.lastCnpjQueryTime = 0;
+window.cnpjCountdownInterval = null;
+window.cnpjPendingTimeout = null;
+window.tempUf = null;
+window.ultimoCnpjProcessado = "";
 window.paginaAtualNotas = 1;
 window.itensPorPaginaNotas = 50;
 window.notasFiltradasAtivas = [];
@@ -77,6 +82,9 @@ window.renderCondominios = renderCondominios;
 window.renderAuditoria = renderAuditoria;
 window.alternarModoConferencia = alternarModoConferencia;
 window.debouncedSearchNotas = debouncedSearchNotas;
+window.buscarCnpjBrasilApi = buscarCnpjBrasilApi;
+window.higienizarPrestadoresUf = higienizarPrestadoresUf;
+window.validarERecarregarCnpj = validarERecarregarCnpj;
 
 // --- DOM ELEMENTS REFERENCE FUNCTION ---
 function getEl(id) {
@@ -303,6 +311,19 @@ export function limparFormulario(forceClearAll = false) {
       "text-xl font-black text-slate-800 uppercase tracking-wide";
   }
 
+  if (window.cnpjCountdownInterval) {
+    clearInterval(window.cnpjCountdownInterval);
+    window.cnpjCountdownInterval = null;
+  }
+  if (window.cnpjPendingTimeout) {
+    clearTimeout(window.cnpjPendingTimeout);
+    window.cnpjPendingTimeout = null;
+  }
+  window.tempUf = null;
+  window.ultimoCnpjProcessado = "";
+  const statusEl = getEl("cnpjApiStatus");
+  if (statusEl) statusEl.classList.add("hidden");
+
   if (forceClearAll || !chkManterCNPJ.checked) {
     window.aliquotasValidas = null;
     iptCnpj.value = "";
@@ -495,6 +516,7 @@ export async function enviarNota() {
           {
             cnpj: rawCnpj,
             razao_social: titleCase(iptRazaoSocial.value),
+            uf: window.tempUf || null,
           },
         ]);
     }
@@ -504,6 +526,7 @@ export async function enviarNota() {
     window.dbEmpresas.push({
       cnpj: rawCnpj,
       nome: titleCase(iptRazaoSocial.value),
+      uf: window.tempUf || null,
     });
     renderEmpresas(false);
   }
@@ -618,11 +641,402 @@ export async function enviarNota() {
     iptCond.focus();
     iptCond.select();
   }
-  } finally {
+} finally {
     window.isSendingNota = false;
   }
 }
 window.enviarNota = enviarNota;
+
+export async function updateEmpresaUfInDb(cnpj, ufRetornada) {
+  const { error } = await supabase
+    .from("empresas")
+    .update({ uf: ufRetornada })
+    .eq("cnpj", cnpj);
+  
+  if (error) {
+    console.error(`Erro ao atualizar uf do CNPJ ${cnpj}:`, error);
+    return { success: false, error };
+  }
+  return { success: true };
+}
+
+export async function buscarCnpjBrasilApi(rawCnpj, existingEmpresa = null) {
+  const statusEl = getEl("cnpjApiStatus");
+  if (statusEl) {
+    statusEl.classList.remove("hidden");
+  }
+
+  if (window.cnpjCountdownInterval) {
+    clearInterval(window.cnpjCountdownInterval);
+    window.cnpjCountdownInterval = null;
+  }
+  if (window.cnpjPendingTimeout) {
+    clearTimeout(window.cnpjPendingTimeout);
+    window.cnpjPendingTimeout = null;
+  }
+
+  const executarRequisicao = async () => {
+    if (statusEl) {
+      statusEl.innerText = "Consultando CNPJ na API...";
+    }
+    window.lastCnpjQueryTime = Date.now();
+
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${rawCnpj}`);
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.status}`);
+      }
+      const apiData = await response.json();
+      const razaoSocialBruta = apiData.razao_social || apiData.nome_fantasia || "";
+      const razaoSocialFormatada = titleCase(razaoSocialBruta);
+      const ufRetornada = (apiData.uf || "").trim().toUpperCase();
+
+      if (statusEl) {
+        statusEl.classList.add("hidden");
+      }
+
+      const iptRazaoSocial = getEl("iptRazaoSocial");
+      const lblRazaoSocial = getEl("lblRazaoSocial");
+
+      if (iptRazaoSocial) {
+        iptRazaoSocial.value = razaoSocialFormatada;
+      }
+
+      const chkOutros = getEl("chkOutrosMunicipios");
+      const boxCod = getEl("boxCodServico");
+      const isOutro = ufRetornada && ufRetornada !== "DF";
+      
+      if (chkOutros) {
+        chkOutros.checked = isOutro;
+      }
+      if (boxCod) {
+        if (isOutro) {
+          boxCod.classList.remove("hidden");
+          boxCod.classList.add("flex");
+        } else {
+          boxCod.classList.add("hidden");
+          boxCod.classList.remove("flex");
+          const iptCod = getEl("iptCodServico");
+          if (iptCod) iptCod.value = "";
+        }
+      }
+
+      if (existingEmpresa) {
+        await updateEmpresaUfInDb(rawCnpj, ufRetornada);
+
+        const idx = (window.dbEmpresas || []).findIndex(x => x.cnpj === rawCnpj);
+        if (idx !== -1) {
+          window.dbEmpresas[idx].uf = ufRetornada;
+        }
+
+        if (iptRazaoSocial) {
+          iptRazaoSocial.readOnly = true;
+          iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed";
+        }
+        if (lblRazaoSocial) {
+          lblRazaoSocial.innerText = `Razão Social (Encontrado) [${ufRetornada}]`;
+          lblRazaoSocial.className = "text-[11px] font-bold text-emerald-700 uppercase transition-colors";
+        }
+      } else {
+        if (iptRazaoSocial) {
+          iptRazaoSocial.readOnly = false;
+          iptRazaoSocial.className = "border border-yellow-500 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm transition-colors";
+        }
+        if (lblRazaoSocial) {
+          lblRazaoSocial.innerText = `Razão Social (Nova Empresa) [${ufRetornada}]`;
+          lblRazaoSocial.className = "text-[11px] font-bold text-yellow-700 uppercase transition-colors";
+        }
+
+        window.tempUf = ufRetornada;
+
+        const boxNovaEmpresa = getEl("boxNovaEmpresa");
+        if (boxNovaEmpresa) {
+          boxNovaEmpresa.classList.remove("hidden");
+          boxNovaEmpresa.classList.add("flex");
+        }
+      }
+
+      showToast(`CNPJ validado com sucesso! UF: ${ufRetornada || "Não informada"}`, "success");
+
+    } catch (error) {
+      console.error("Erro na consulta de CNPJ:", error);
+      if (statusEl) {
+        statusEl.classList.add("hidden");
+      }
+      showToast("API do BrasilAPI instável ou offline. Liberado para digitação manual.", "warning");
+
+      const iptRazaoSocial = getEl("iptRazaoSocial");
+      const lblRazaoSocial = getEl("lblRazaoSocial");
+      if (iptRazaoSocial) {
+        iptRazaoSocial.readOnly = false;
+        iptRazaoSocial.placeholder = "Digite o nome da empresa...";
+        iptRazaoSocial.className = "border border-yellow-500 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm transition-colors";
+      }
+      if (lblRazaoSocial) {
+        lblRazaoSocial.innerText = "Razão Social (Preenchimento Manual)";
+        lblRazaoSocial.className = "text-[11px] font-bold text-yellow-700 uppercase transition-colors";
+      }
+      const boxNovaEmpresa = getEl("boxNovaEmpresa");
+      if (boxNovaEmpresa) {
+        boxNovaEmpresa.classList.remove("hidden");
+        boxNovaEmpresa.classList.add("flex");
+      }
+    }
+  };
+
+  const now = Date.now();
+  const timeSinceLastCall = now - (window.lastCnpjQueryTime || 0);
+  const remainingTimeMs = Math.max(0, 5000 - timeSinceLastCall);
+
+  if (remainingTimeMs === 0) {
+    await executarRequisicao();
+  } else {
+    let secondsLeft = Math.ceil(remainingTimeMs / 1000);
+    if (statusEl) {
+      statusEl.innerText = `Aguardando ${secondsLeft} segundos para validar CNPJ...`;
+    }
+
+    window.cnpjCountdownInterval = setInterval(() => {
+      secondsLeft--;
+      if (secondsLeft <= 0) {
+        clearInterval(window.cnpjCountdownInterval);
+        window.cnpjCountdownInterval = null;
+      } else {
+        if (statusEl) {
+          statusEl.innerText = `Aguardando ${secondsLeft} segundos para validar CNPJ...`;
+        }
+      }
+    }, 1000);
+
+    window.cnpjPendingTimeout = setTimeout(async () => {
+      if (window.cnpjCountdownInterval) {
+        clearInterval(window.cnpjCountdownInterval);
+        window.cnpjCountdownInterval = null;
+      }
+      await executarRequisicao();
+    }, remainingTimeMs);
+  }
+}
+
+export async function validarERecarregarCnpj(raw) {
+  const iptCnpj = getEl("iptCnpj");
+  const iptRazaoSocial = getEl("iptRazaoSocial");
+  const lblRazaoSocial = getEl("lblRazaoSocial");
+
+  if (!raw) {
+    window.aliquotasValidas = null;
+    window.ultimoCnpjProcessado = "";
+    if (iptRazaoSocial) {
+      iptRazaoSocial.value = "";
+      iptRazaoSocial.readOnly = false;
+      iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
+    }
+    if (lblRazaoSocial) {
+      lblRazaoSocial.innerText = "Razão Social";
+      lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
+    }
+    const boxNovaEmpresa = getEl("boxNovaEmpresa");
+    if (boxNovaEmpresa) {
+      boxNovaEmpresa.classList.add("hidden");
+      boxNovaEmpresa.classList.remove("flex");
+    }
+    return;
+  }
+
+  if (raw.length === 12 || raw.length === 13) {
+    raw = raw.padStart(14, "0");
+  }
+
+  const formatted = mascararCNPJ(raw);
+  if (iptCnpj) {
+    iptCnpj.value = formatted;
+  }
+
+  if (raw === window.ultimoCnpjProcessado) {
+    return;
+  }
+  window.ultimoCnpjProcessado = raw;
+
+  if (!validarCNPJ(formatted)) {
+    window.aliquotasValidas = null;
+    showToast("CNPJ inválido!", "error");
+    if (iptCnpj) iptCnpj.value = "";
+    if (iptRazaoSocial) iptRazaoSocial.value = "";
+    const boxNovaEmpresa = getEl("boxNovaEmpresa");
+    if (boxNovaEmpresa) {
+      boxNovaEmpresa.classList.add("hidden");
+      boxNovaEmpresa.classList.remove("flex");
+    }
+    setTimeout(() => {
+      if (iptCnpj) iptCnpj.focus();
+    }, 10);
+    return;
+  }
+
+  if (window.verificarCnpjCondominio) {
+    if (window.verificarCnpjCondominio(formatted)) {
+      return;
+    }
+  }
+
+  let emp = null;
+  try {
+    const { data } = await supabase
+      .from("empresas")
+      .select("*")
+      .eq("cnpj", raw)
+      .maybeSingle();
+    if (data) {
+      emp = { cnpj: data.cnpj, nome: data.razao_social, uf: data.UF || data.uf };
+    }
+  } catch (e) {
+    console.error(e);
+  }
+
+  if (emp) {
+    if (iptRazaoSocial) {
+      iptRazaoSocial.value = titleCase(emp.nome);
+      iptRazaoSocial.readOnly = true;
+      iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed";
+    }
+    if (lblRazaoSocial) {
+      lblRazaoSocial.innerText = `Razão Social (Encontrado)${emp.uf ? ` [${emp.uf}]` : ""}`;
+      lblRazaoSocial.className = "text-[11px] font-bold text-emerald-700 uppercase transition-colors";
+    }
+    const boxNovaEmpresa = getEl("boxNovaEmpresa");
+    if (boxNovaEmpresa) {
+      boxNovaEmpresa.classList.add("hidden");
+      boxNovaEmpresa.classList.remove("flex");
+    }
+
+    if (emp.uf) {
+      const isOutro = emp.uf.trim().toUpperCase() !== "DF";
+      const chkOutros = getEl("chkOutrosMunicipios");
+      const boxCod = getEl("boxCodServico");
+      if (chkOutros) {
+        chkOutros.checked = isOutro;
+        if (isOutro) {
+          if (boxCod) {
+            boxCod.classList.remove("hidden");
+            boxCod.classList.add("flex");
+          }
+        } else {
+          if (boxCod) {
+            boxCod.classList.add("hidden");
+            boxCod.classList.remove("flex");
+          }
+          const iptCod = getEl("iptCodServico");
+          if (iptCod) iptCod.value = "";
+        }
+      }
+    }
+
+    carregarSmartDefaults(raw);
+
+    if (!emp.uf) {
+      await buscarCnpjBrasilApi(raw, emp);
+    }
+  } else {
+    window.aliquotasValidas = null;
+    window.tempUf = null;
+    await buscarCnpjBrasilApi(raw, null);
+  }
+}
+
+export async function higienizarPrestadoresUf() {
+  const btn = getEl("btnHigienizarUf");
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("opacity-50", "cursor-not-allowed");
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("*");
+    if (error) {
+      showToast("Erro ao buscar prestadores: " + error.message, "error");
+      return;
+    }
+
+    const prestadoresSemUf = (data || []).filter(e => {
+      const uf = (e.UF || e.uf || "").trim();
+      return !uf;
+    });
+
+    if (prestadoresSemUf.length === 0) {
+      showToast("Todos os prestadores já possuem UF cadastrada!", "success");
+      return;
+    }
+
+    showToast(`Encontrados ${prestadoresSemUf.length} prestadores sem UF. Iniciando higienização a cada 5 segundos...`, "info");
+
+    let sucessos = 0;
+    let falhas = 0;
+
+    for (let i = 0; i < prestadoresSemUf.length; i++) {
+      const prestador = prestadoresSemUf[i];
+      const cleanCnpj = prestador.cnpj.replace(/[^\d]+/g, "");
+
+      if (btn) {
+        btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[14px]">sync</span> Processando ${i + 1}/${prestadoresSemUf.length}`;
+      }
+
+      try {
+        const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
+        if (response.ok) {
+          const apiData = await response.json();
+          const ufRetornada = (apiData.uf || "").trim().toUpperCase();
+          if (ufRetornada) {
+            const resUpdate = await updateEmpresaUfInDb(prestador.cnpj, ufRetornada);
+            let success = resUpdate.success;
+            
+            if (!success) {
+              console.warn(`Falha na atualização direta do CNPJ ${prestador.cnpj}. Tentando com CNPJ higienizado...`);
+              const resUpdateClean = await updateEmpresaUfInDb(cleanCnpj, ufRetornada);
+              success = resUpdateClean.success;
+            }
+
+            if (success) {
+              const idx = (window.dbEmpresas || []).findIndex(x => x.cnpj === prestador.cnpj || x.cnpj === cleanCnpj);
+              if (idx !== -1) {
+                window.dbEmpresas[idx].uf = ufRetornada;
+              }
+              sucessos++;
+            } else {
+              falhas++;
+            }
+          } else {
+            falhas++;
+          }
+        } else {
+          falhas++;
+        }
+      } catch (err) {
+        console.error(`Erro ao higienizar CNPJ ${prestador.cnpj}:`, err);
+        falhas++;
+      }
+
+      if (i < prestadoresSemUf.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    showToast(`Higienização concluída! Sucessos: ${sucessos}, Falhas/Ignorados: ${falhas}`, "success");
+    if (window.sincronizarDados) {
+      await window.sincronizarDados("empresas");
+    }
+  } catch (e) {
+    console.error("Erro na higienização:", e);
+    showToast("Erro durante o processo de higienização.", "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove("opacity-50", "cursor-not-allowed");
+      btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">cleaning_services</span> Higienizar UFs`;
+    }
+  }
+}
 
 export function alterarAba(tabId) {
   const conteudos = document.querySelectorAll(".aba-conteudo");
@@ -2529,69 +2943,21 @@ window.addEventListener("DOMContentLoaded", () => {
         let raw = el.value.replace(/[^\d]+/g, "");
         if (raw) {
           e.preventDefault();
-          window.cnpjJaProcessadoTeclado = true;
-
-          if (raw.length === 12 || raw.length === 13) {
-            raw = raw.padStart(14, "0");
-            el.value = mascararCNPJ(raw);
-          }
-
-          if (!validarCNPJ(el.value)) {
-            showToast("CNPJ inválido!", "error");
-            el.value = "";
-            getEl("iptRazaoSocial").value = "";
-            getEl("boxNovaEmpresa").classList.add("hidden");
-            getEl("boxNovaEmpresa").classList.remove("flex");
-            setTimeout(() => el.focus(), 10);
-            return;
-          }
-
-          if (window.verificarCnpjCondominio) {
-            if (window.verificarCnpjCondominio(el.value)) {
-              return;
-            }
-          }
-
-          let emp = window.dbEmpresas.find(x => String(x.cnpj) === raw);
-          const iptRazaoSocial = getEl("iptRazaoSocial");
-          const lblRazaoSocial = getEl("lblRazaoSocial");
-          
-          if (emp) {
-            iptRazaoSocial.value = titleCase(emp.nome);
-            iptRazaoSocial.readOnly = true;
-            iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed";
-            lblRazaoSocial.innerText = "Razão Social (Encontrado)";
-            lblRazaoSocial.className = "text-[11px] font-bold text-emerald-700 uppercase transition-colors";
-            getEl("boxNovaEmpresa").classList.add("hidden");
-            getEl("boxNovaEmpresa").classList.remove("flex");
-
-            carregarSmartDefaults(raw);
-
+          window.validarERecarregarCnpj(raw).then(() => {
+            const iptRazaoSocial = getEl("iptRazaoSocial");
             setTimeout(() => {
-              const iptNota = getEl("iptNota");
-              if (iptNota) {
-                iptNota.focus();
-                iptNota.select();
-              }
-            }, 20);
-          } else {
-            iptRazaoSocial.value = "";
-            iptRazaoSocial.readOnly = false;
-            iptRazaoSocial.placeholder = "Digite o nome da empresa...";
-            iptRazaoSocial.className = "border border-yellow-500 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm transition-colors";
-            lblRazaoSocial.innerText = "Razão Social (Nova Empresa)";
-            lblRazaoSocial.className = "text-[11px] font-bold text-yellow-700 uppercase transition-colors";
-            getEl("boxNovaEmpresa").classList.remove("hidden");
-            getEl("boxNovaEmpresa").classList.add("flex");
-            showToast("CNPJ não cadastrado. Preencha o nome da empresa.", "warning");
-
-            setTimeout(() => {
-              if (iptRazaoSocial) {
+              if (iptRazaoSocial && !iptRazaoSocial.readOnly) {
                 iptRazaoSocial.focus();
                 iptRazaoSocial.select();
+              } else {
+                const iptNota = getEl("iptNota");
+                if (iptNota) {
+                  iptNota.focus();
+                  iptNota.select();
+                }
               }
-            }, 20);
-          }
+            }, 80);
+          });
           return;
         }
       }
@@ -2748,6 +3114,21 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (iptCnpj) {
     iptCnpj.addEventListener("input", async function () {
+      window.ultimoCnpjProcessado = "";
+      if (window.cnpjCountdownInterval) {
+        clearInterval(window.cnpjCountdownInterval);
+        window.cnpjCountdownInterval = null;
+      }
+      if (window.cnpjPendingTimeout) {
+        clearTimeout(window.cnpjPendingTimeout);
+        window.cnpjPendingTimeout = null;
+      }
+      const statusEl = getEl("cnpjApiStatus");
+      if (statusEl) {
+        statusEl.classList.add("hidden");
+        statusEl.innerText = "";
+      }
+
       let valFormatado = mascararCNPJ(this.value);
       this.value = valFormatado;
 
@@ -2784,105 +3165,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
     iptCnpj.addEventListener("blur", async function () {
       setTimeout(async () => {
-        if (window.cnpjJaProcessadoTeclado) {
-          window.cnpjJaProcessadoTeclado = false;
-          return;
-        }
         if (listaCnpj && !listaCnpj.classList.contains("hidden")) {
           listaCnpj.classList.add("hidden");
-          if (iptRazaoSocial) {
-            iptRazaoSocial.value = "";
-            iptRazaoSocial.readOnly = false;
-            iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
-          }
-          if (lblRazaoSocial) {
-            lblRazaoSocial.innerText = "Razão Social";
-            lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
-          }
-          const boxNovaEmpresa = getEl("boxNovaEmpresa");
-          if (boxNovaEmpresa) {
-            boxNovaEmpresa.classList.add("hidden");
-            boxNovaEmpresa.classList.remove("flex");
-          }
         }
-
         let raw = iptCnpj.value.replace(/[^\d]+/g, "");
-        if (!raw) {
-          window.aliquotasValidas = null;
-          if (iptRazaoSocial) {
-            iptRazaoSocial.value = "";
-            iptRazaoSocial.readOnly = false;
-            iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:border-emerald-500 shadow-sm transition-colors";
-          }
-          if (lblRazaoSocial) {
-            lblRazaoSocial.innerText = "Razão Social";
-            lblRazaoSocial.className = "text-[11px] font-bold text-slate-700 uppercase transition-colors";
-          }
-          const boxNovaEmpresa = getEl("boxNovaEmpresa");
-          if (boxNovaEmpresa) {
-            boxNovaEmpresa.classList.add("hidden");
-            boxNovaEmpresa.classList.remove("flex");
-          }
-          return;
-        }
-
-        if (raw.length === 12 || raw.length === 13) {
-          raw = raw.padStart(14, "0");
-          iptCnpj.value = mascararCNPJ(raw);
-        }
-
-        if (!validarCNPJ(iptCnpj.value)) {
-          window.aliquotasValidas = null;
-          showToast("CNPJ inválido!", "error");
-          iptCnpj.value = "";
-          iptRazaoSocial.value = "";
-          getEl("boxNovaEmpresa").classList.add("hidden");
-          getEl("boxNovaEmpresa").classList.remove("flex");
-          setTimeout(() => iptCnpj.focus(), 10);
-          return;
-        }
-
-        if (window.verificarCnpjCondominio) {
-          if (window.verificarCnpjCondominio(iptCnpj.value)) {
-            return;
-          }
-        }
-
-        let emp = null;
-        try {
-          const { data } = await supabase
-            .from("empresas")
-            .select("*")
-            .eq("cnpj", raw)
-            .maybeSingle();
-          if (data) emp = { cnpj: data.cnpj, nome: data.razao_social };
-        } catch (e) {
-          console.error(e);
-        }
-        if (emp) {
-          iptRazaoSocial.value = titleCase(emp.nome);
-          iptRazaoSocial.readOnly = true;
-          iptRazaoSocial.className = "border border-slate-300 p-2 text-[13px] rounded bg-slate-100 font-medium focus:outline-none shadow-sm transition-colors text-emerald-900 cursor-not-allowed";
-          lblRazaoSocial.innerText = "Razão Social (Encontrado)";
-          lblRazaoSocial.className = "text-[11px] font-bold text-emerald-700 uppercase transition-colors";
-          getEl("boxNovaEmpresa").classList.add("hidden");
-          getEl("boxNovaEmpresa").classList.remove("flex");
-
-          carregarSmartDefaults(raw);
-        } else {
-          window.aliquotasValidas = null;
-          iptRazaoSocial.value = "";
-          iptRazaoSocial.readOnly = false;
-          iptRazaoSocial.placeholder = "Digite o nome da empresa...";
-          iptRazaoSocial.className = "border border-yellow-500 p-2 text-[13px] rounded bg-white font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm transition-colors";
-          lblRazaoSocial.innerText = "Razão Social (Nova Empresa)";
-          lblRazaoSocial.className = "text-[11px] font-bold text-yellow-700 uppercase transition-colors";
-          getEl("boxNovaEmpresa").classList.remove("hidden");
-          getEl("boxNovaEmpresa").classList.add("flex");
-          showToast("CNPJ não cadastrado. Preencha o nome da empresa.", "warning");
-          setTimeout(() => iptRazaoSocial.focus(), 80);
-        }
-      }, 50);
+        await window.validarERecarregarCnpj(raw);
+      }, 100);
     });
   }
 

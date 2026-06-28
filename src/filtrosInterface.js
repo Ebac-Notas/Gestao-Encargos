@@ -109,6 +109,7 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
         window.dbEmpresas = data.map((e) => ({
           cnpj: e.cnpj,
           nome: e.razao_social,
+          uf: e.UF || e.uf || null,
         }));
       }
     }

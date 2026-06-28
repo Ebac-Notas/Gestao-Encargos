@@ -842,6 +842,7 @@
                     autocomplete="off"
                     class="border border-slate-300 p-2 text-[14px] rounded focus:outline-none focus:border-emerald-500 font-mono shadow-inner text-slate-800 font-bold"
                   />
+                  <div id="cnpjApiStatus" class="text-[11px] text-amber-600 font-bold mt-1 hidden"></div>
                   <ul
                     id="listaCnpj"
                     class="absolute top-[100%] left-0 w-full bg-white border border-slate-300 rounded shadow-lg max-h-48 overflow-y-auto hidden z-[60] mt-1 divide-y divide-slate-100"
@@ -1312,16 +1313,28 @@
             class="bg-white border text-slate-800 border-slate-300 rounded shadow-md flex flex-col overflow-hidden h-full"
           >
             <div
-              class="bg-slate-800 text-white px-5 py-4 flex items-center gap-3 shrink-0 border-b-4 border-slate-900"
+              class="bg-slate-800 text-white px-5 py-4 flex items-center justify-between gap-3 shrink-0 border-b-4 border-slate-900"
             >
-              <span class="material-symbols-outlined text-xl">policy</span>
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-xl">policy</span>
+                <div>
+                  <h3 class="text-sm font-bold uppercase tracking-widest">
+                    Log de Auditoria
+                  </h3>
+                  <p class="text-slate-300 text-[10px] font-mono mt-0.5">
+                    REGISTRO DE ATIVIDADES NO SISTEMA (MOCK)
+                  </p>
+                </div>
+              </div>
               <div>
-                <h3 class="text-sm font-bold uppercase tracking-widest">
-                  Log de Auditoria
-                </h3>
-                <p class="text-slate-300 text-[10px] font-mono mt-0.5">
-                  REGISTRO DE ATIVIDADES NO SISTEMA (MOCK)
-                </p>
+                <button
+                  id="btnHigienizarUf"
+                  onclick="higienizarPrestadoresUf()"
+                  class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-[11px] font-bold uppercase rounded shadow transition-all flex gap-1.5 items-center cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[14px]">cleaning_services</span>
+                  Higienizar UFs
+                </button>
               </div>
             </div>
 
