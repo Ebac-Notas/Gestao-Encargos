@@ -83,7 +83,7 @@ window.renderAuditoria = renderAuditoria;
 window.alternarModoConferencia = alternarModoConferencia;
 window.debouncedSearchNotas = debouncedSearchNotas;
 window.buscarCnpjBrasilApi = buscarCnpjBrasilApi;
-window.higienizarPrestadoresUf = higienizarPrestadoresUf;
+
 window.validarERecarregarCnpj = validarERecarregarCnpj;
 
 // --- DOM ELEMENTS REFERENCE FUNCTION ---
@@ -943,100 +943,7 @@ export async function validarERecarregarCnpj(raw) {
   }
 }
 
-export async function higienizarPrestadoresUf() {
-  const btn = getEl("btnHigienizarUf");
-  if (btn) {
-    btn.disabled = true;
-    btn.classList.add("opacity-50", "cursor-not-allowed");
-  }
 
-  try {
-    const { data, error } = await supabase
-      .from("empresas")
-      .select("*");
-    if (error) {
-      showToast("Erro ao buscar prestadores: " + error.message, "error");
-      return;
-    }
-
-    const prestadoresSemUf = (data || []).filter(e => {
-      const uf = (e.UF || e.uf || "").trim();
-      return !uf;
-    });
-
-    if (prestadoresSemUf.length === 0) {
-      showToast("Todos os prestadores já possuem UF cadastrada!", "success");
-      return;
-    }
-
-    showToast(`Encontrados ${prestadoresSemUf.length} prestadores sem UF. Iniciando higienização a cada 5 segundos...`, "info");
-
-    let sucessos = 0;
-    let falhas = 0;
-
-    for (let i = 0; i < prestadoresSemUf.length; i++) {
-      const prestador = prestadoresSemUf[i];
-      const cleanCnpj = prestador.cnpj.replace(/[^\d]+/g, "");
-
-      if (btn) {
-        btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[14px]">sync</span> Processando ${i + 1}/${prestadoresSemUf.length}`;
-      }
-
-      try {
-        const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
-        if (response.ok) {
-          const apiData = await response.json();
-          const ufRetornada = (apiData.uf || "").trim().toUpperCase();
-          if (ufRetornada) {
-            const resUpdate = await updateEmpresaUfInDb(prestador.cnpj, ufRetornada);
-            let success = resUpdate.success;
-            
-            if (!success) {
-              console.warn(`Falha na atualização direta do CNPJ ${prestador.cnpj}. Tentando com CNPJ higienizado...`);
-              const resUpdateClean = await updateEmpresaUfInDb(cleanCnpj, ufRetornada);
-              success = resUpdateClean.success;
-            }
-
-            if (success) {
-              const idx = (window.dbEmpresas || []).findIndex(x => x.cnpj === prestador.cnpj || x.cnpj === cleanCnpj);
-              if (idx !== -1) {
-                window.dbEmpresas[idx].uf = ufRetornada;
-              }
-              sucessos++;
-            } else {
-              falhas++;
-            }
-          } else {
-            falhas++;
-          }
-        } else {
-          falhas++;
-        }
-      } catch (err) {
-        console.error(`Erro ao higienizar CNPJ ${prestador.cnpj}:`, err);
-        falhas++;
-      }
-
-      if (i < prestadoresSemUf.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-
-    showToast(`Higienização concluída! Sucessos: ${sucessos}, Falhas/Ignorados: ${falhas}`, "success");
-    if (window.sincronizarDados) {
-      await window.sincronizarDados("empresas");
-    }
-  } catch (e) {
-    console.error("Erro na higienização:", e);
-    showToast("Erro durante o processo de higienização.", "error");
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.classList.remove("opacity-50", "cursor-not-allowed");
-      btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">cleaning_services</span> Higienizar UFs`;
-    }
-  }
-}
 
 export function alterarAba(tabId) {
   const conteudos = document.querySelectorAll(".aba-conteudo");
