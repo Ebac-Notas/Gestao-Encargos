@@ -1099,8 +1099,8 @@
                   <button
                     type="button"
                     id="btnEnviarNota"
-                    onclick="enviarNota()"
-                    onkeydown="if (event.key === 'Enter') enviarNota();"
+                    onclick="enviarNota(null, event)"
+                    onkeydown="if (event.key === 'Enter') enviarNota(null, event);"
                     class="px-8 py-2 bg-indigo-600 text-white text-[13px] font-bold uppercase rounded shadow border border-indigo-800 hover:bg-indigo-700 hover:scale-[1.02] transition-all nav-field focus:outline-none focus:ring-4 focus:ring-indigo-400 focus:ring-opacity-50 flex gap-2 items-center"
                   >
                     <span class="material-symbols-outlined text-[18px]"
@@ -2005,6 +2005,57 @@
               >play_arrow</span
             >
             Processar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Interceptação de Dia de Emissão -->
+    <div
+      id="modalInterceptarDia"
+      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] hidden"
+    >
+      <div
+        class="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+      >
+        <div class="bg-amber-600 px-4 py-3 flex items-center justify-between">
+          <h3 class="text-white font-bold uppercase text-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[18px]">warning</span>
+            Confirmação de Emissão
+          </h3>
+          <button
+            onclick="
+              document.getElementById('modalInterceptarDia').classList.add('hidden');
+              const elDia = document.getElementById('iptDiaEmissao');
+              if (elDia) { elDia.focus(); elDia.select(); }
+            "
+            class="text-amber-100 hover:text-white"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="p-5 flex flex-col gap-3">
+          <p class="text-sm text-slate-700 leading-relaxed">
+            ⚠️ O dia digitado (<strong id="interceptarDiaDigitado"></strong>) é maior que o dia de hoje (<strong id="interceptarDiaAtual"></strong>).
+          </p>
+          <p class="text-sm font-semibold text-slate-900">
+            Esta nota fiscal pertence ao mês anterior?
+          </p>
+        </div>
+        <div
+          class="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end gap-2"
+        >
+          <button
+            id="btnInterceptarNao"
+            class="px-4 py-2 text-xs font-bold text-slate-600 uppercase hover:bg-slate-200 rounded cursor-pointer transition-colors"
+          >
+            Não, corrigir dia
+          </button>
+          <button
+            id="btnInterceptarSim"
+            class="px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white uppercase rounded shadow-sm flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            Sim, é do mês anterior
           </button>
         </div>
       </div>
