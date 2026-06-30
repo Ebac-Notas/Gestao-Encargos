@@ -381,7 +381,10 @@ export function limparFormulario(forceClearAll = false) {
 }
 window.limparFormulario = limparFormulario;
 
-export async function enviarNota() {
+export async function enviarNota(overrideParams = null, event = null) {
+  if (event && event.preventDefault) {
+    event.preventDefault();
+  }
   if (window.isSendingNota) return;
   window.isSendingNota = true;
 
@@ -429,6 +432,77 @@ export async function enviarNota() {
     return;
   }
 
+  let refSelecionada = getEl("txtReferencia").value;
+  if (!refSelecionada) {
+    showToast("Selecione uma Competência de Lançamento no topo da tela.", "error");
+    return;
+  }
+
+  // Interceptação inteligente do dia de emissão
+  if (!overrideParams) {
+    const diaAtual = new Date().getDate();
+    if (diaDigitado > diaAtual) {
+      const modal = getEl("modalInterceptarDia");
+      if (modal) {
+        getEl("interceptarDiaDigitado").innerText = diaDigitado;
+        getEl("interceptarDiaAtual").innerText = diaAtual;
+        modal.classList.remove("hidden");
+
+        const btnNao = getEl("btnInterceptarNao");
+        const btnSim = getEl("btnInterceptarSim");
+
+        btnNao.onclick = () => {
+          modal.classList.add("hidden");
+          window.isSendingNota = false;
+          iptDiaEmissao.focus();
+          iptDiaEmissao.select();
+        };
+
+        btnSim.onclick = async () => {
+          modal.classList.add("hidden");
+          window.isSendingNota = false; // libere o lock do envio temporariamente para a chamada recursiva
+
+          const partesRef = refSelecionada.split("-");
+          const statusMeseAnoAtual = parseInt(partesRef[1]) - 1; // 0-11
+          const anoReferencia = parseInt(partesRef[0]);
+
+          const hoje = new Date();
+          let anoDestino = anoReferencia || hoje.getFullYear();
+          let mesDestino = statusMeseAnoAtual;
+
+          // Retrocede para o mês anterior
+          mesDestino = mesDestino - 1;
+
+          // Tratamento para a virada de ano (Se o sistema estava em Janeiro, o mês destino vira Dezembro do ano anterior)
+          if (mesDestino < 0) {
+            mesDestino = 11;
+            anoDestino -= 1;
+          }
+
+          // Validação de meses curtos (ex: evitar 30 de fevereiro)
+          const ultimoDiaDoMesAnterior = new Date(anoDestino, mesDestino + 1, 0).getDate();
+          let diaFinal = diaDigitado;
+
+          if (diaFinal > ultimoDiaDoMesAnterior) {
+            diaFinal = ultimoDiaDoMesAnterior;
+          }
+
+          // Re-envia com os valores corrigidos
+          await enviarNota({ dia: diaFinal, mes: mesDestino, ano: anoDestino }, event);
+        };
+      }
+      return;
+    }
+  }
+
+  // Aplicar parâmetros corrigidos se houver
+  if (overrideParams) {
+    diaDigitado = overrideParams.dia;
+    const mesStrCorrigido = String(overrideParams.mes + 1).padStart(2, "0");
+    const anoStrCorrigido = String(overrideParams.ano);
+    refSelecionada = `${anoStrCorrigido}-${mesStrCorrigido}`;
+  }
+
   let valBruto = parseFloat(iptValorBruto.value) || 0;
   if (valBruto <= 0) {
     showToast("Valor bruto não pode ser zero.", "error");
@@ -439,12 +513,6 @@ export async function enviarNota() {
   if (issCalc > valBruto * 0.1) {
     showToast("ISS inválido: não pode ser maior que 10% do total.", "error");
     iptISS.focus();
-    return;
-  }
-
-  let refSelecionada = getEl("txtReferencia").value;
-  if (!refSelecionada) {
-    showToast("Selecione uma Competência de Lançamento no topo da tela.", "error");
     return;
   }
 
