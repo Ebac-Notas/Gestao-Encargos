@@ -11,7 +11,9 @@ import {
   ativarEdicaoPccManual, 
   atualizarSomaPcc, 
   carregarSmartDefaults,
-  atualizarStatusConferida
+  atualizarStatusConferida,
+  predizerEncargos,
+  debouncedPredizerEncargos
 } from "./calculosImpostos.js";
 import { 
   formatDateTime, 
@@ -69,6 +71,8 @@ window.ativarEdicaoPccManual = ativarEdicaoPccManual;
 window.atualizarSomaPcc = atualizarSomaPcc;
 window.carregarSmartDefaults = carregarSmartDefaults;
 window.atualizarStatusConferida = atualizarStatusConferida;
+window.predizerEncargos = predizerEncargos;
+window.debouncedPredizerEncargos = debouncedPredizerEncargos;
 
 // --- EXPOSE INTERFACE MODULE TO GLOBAL WINDOW ---
 window.formatDateTime = formatDateTime;
@@ -2821,6 +2825,7 @@ window.addEventListener("DOMContentLoaded", () => {
           .eq("codigo", val)
           .maybeSingle();
         if (data) {
+          debouncedPredizerEncargos();
           if (lblCondHeader) {
             lblCondHeader.innerText = data.razao_social;
             lblCondHeader.className = "text-xl font-black text-emerald-700 uppercase tracking-wide";
@@ -3345,28 +3350,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (iptValorBruto) {
     iptValorBruto.addEventListener("input", function () {
-      let bruto = parseFloat(iptValorBruto.value) || 0;
-
-      if (window.aliquotasValidas) {
-        if (window.aliquotasValidas.iss !== undefined) {
-          const elIss = getEl("iptISS");
-          if (elIss) elIss.value = (bruto * window.aliquotasValidas.iss).toFixed(2);
-        }
-        if (window.aliquotasValidas.inss !== undefined) {
-          const elInss = getEl("iptINSS");
-          if (elInss) elInss.value = (bruto * window.aliquotasValidas.inss).toFixed(2);
-        }
-        if (window.aliquotasValidas.ir !== undefined) {
-          const elIr = getEl("iptIR");
-          if (elIr) elIr.value = (bruto * window.aliquotasValidas.ir).toFixed(2);
-        }
-      }
-
-      if (getEl("chkPis").checked && !window.pisModificadoManualmente) {
-        calcularPisCofins();
-      }
-
-      recalcularValorLiquido();
+      debouncedPredizerEncargos();
     });
   }
 
