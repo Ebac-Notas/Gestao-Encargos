@@ -199,66 +199,187 @@ export function atualizarSomaPcc() {
   recalcularValorLiquido();
 }
 
-export async function carregarSmartDefaults(cnpjRaw) {
+export function predizerImpostoPorAmostra(novoValorBruto, notaAmostraEncontrada) {
+  const resultado = {};
+  const impostos = ['inss', 'iss', 'pcc', 'irrf'];
+  
+  impostos.forEach(imposto => {
+    const valorAntigo = notaAmostraEncontrada[`valor_${imposto}`] || 0;
+    const brutoAntigo = notaAmostraEncontrada.valor_bruto;
+
+    if (valorAntigo > 0 && brutoAntigo > 0) {
+      // Encontra a alíquota real praticada na nota de amostra
+      const aliquotaEfetiva = valorAntigo / brutoAntigo;
+      const valorSugerido = novoValorBruto * aliquotaEfetiva;
+
+      // Arredonda estritamente para duas casas decimais (centavos)
+      resultado[imposto] = Math.round((valorSugerido + Number.EPSILON) * 100) / 100;
+    } else {
+      resultado[imposto] = 0;
+    }
+  });
+
+  return resultado;
+}
+
+export function aplicarValoresSugeridos(valores) {
+  const elIss = document.getElementById("iptISS");
+  const elInss = document.getElementById("iptINSS");
+  const elIr = document.getElementById("iptIR");
+  const chkPis = document.getElementById("chkPis");
+  const iptPisContainer = document.getElementById("iptPisContainer");
+  const elPisVal = document.getElementById("iptPisVal");
+  const elPis = document.getElementById("iptPIS");
+  const elCofins = document.getElementById("iptCOFINS");
+  const elCsll = document.getElementById("iptCSLL");
+
+  if (elIss) elIss.value = valores.iss > 0 ? valores.iss.toFixed(2) : "";
+  if (elInss) elInss.value = valores.inss > 0 ? valores.inss.toFixed(2) : "";
+  if (elIr) elIr.value = valores.irrf > 0 ? valores.irrf.toFixed(2) : "";
+
+  if (chkPis && iptPisContainer) {
+    if (valores.pcc > 0) {
+      chkPis.checked = true;
+      iptPisContainer.classList.remove("hidden");
+      iptPisContainer.classList.add("flex");
+      if (elPisVal) elPisVal.value = valores.pcc.toFixed(2);
+      if (elPis) elPis.value = valores.val_pis > 0 ? valores.val_pis.toFixed(2) : "";
+      if (elCofins) elCofins.value = valores.val_cofins > 0 ? valores.val_cofins.toFixed(2) : "";
+      if (elCsll) elCsll.value = valores.val_csll > 0 ? valores.val_csll.toFixed(2) : "";
+    } else {
+      chkPis.checked = false;
+      iptPisContainer.classList.add("hidden");
+      iptPisContainer.classList.remove("flex");
+      if (elPisVal) elPisVal.value = "";
+      if (elPis) elPis.value = "";
+      if (elCofins) elCofins.value = "";
+      if (elCsll) elCsll.value = "";
+    }
+  }
+
+  // Recalcula o valor líquido na tela
+  recalcularValorLiquido();
+}
+
+export async function predizerEncargos() {
   if (!supabase) return;
-  const raw = cnpjRaw.replace(/[^\d]+/g, "");
-  if (!raw) return;
+
+  const iptCnpj = document.getElementById("iptCnpj");
+  const iptValorBruto = document.getElementById("iptValorBruto");
+  const iptCondominio = document.getElementById("iptCondominio");
+
+  if (!iptCnpj || !iptValorBruto || !iptCondominio) return;
+
+  const rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "").padStart(14, "0");
+  const valorBruto = parseFloat(iptValorBruto.value) || 0;
+  const codCond = iptCondominio.value.trim();
+
+  // O gatilho de busca deve ocorrer de forma assíncrona assim que o usuário preencher o CNPJ e o Valor Bruto da nota atual.
+  if (!rawCnpj || rawCnpj.length < 14 || valorBruto <= 0 || !codCond) {
+    return;
+  }
+
   try {
-    const { data, error } = await supabase
+    // REGRA 1 (Mesmo Condomínio, Mesmo Valor Bruto)
+    const { data: dataR1, error: errorR1 } = await supabase
       .from("notas_fiscais")
-      .select("valor_bruto, iss, inss, ir, val_pis, val_cofins, val_csll")
-      .eq("empresa_cnpj", raw)
+      .select("*")
+      .eq("condominio_codigo", codCond)
+      .eq("empresa_cnpj", rawCnpj)
+      .eq("valor_bruto", valorBruto)
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (error) {
-      console.error("Erro ao buscar ultima nota para smart defaults:", error);
+    if (errorR1) {
+      console.error("Erro na busca da Regra 1:", errorR1);
+    }
+
+    if (dataR1 && dataR1.length > 0) {
+      const nota = dataR1[0];
+      aplicarValoresSugeridos({
+        inss: parseFloat(nota.inss) || 0,
+        iss: parseFloat(nota.iss) || 0,
+        irrf: parseFloat(nota.ir) || 0,
+        pcc: parseFloat(nota.pis_digitado) || 0,
+        val_pis: parseFloat(nota.val_pis) || 0,
+        val_cofins: parseFloat(nota.val_cofins) || 0,
+        val_csll: parseFloat(nota.val_csll) || 0
+      });
       return;
     }
 
-    if (data && data.length > 0) {
-      const notaAnterior = data[0];
-      const valorBrutoAnterior = parseFloat(notaAnterior.valor_bruto) || 0;
-      if (valorBrutoAnterior > 0) {
-        const valorIssAnterior = parseFloat(notaAnterior.iss) || 0;
-        const valorInssAnterior = parseFloat(notaAnterior.inss) || 0;
-        const valorIrAnterior = parseFloat(notaAnterior.ir) || 0;
+    // REGRA 2 (Outro Condomínio, Valor Bruto Próximo - Range de 20%)
+    const minBruto = valorBruto * 0.8;
+    const maxBruto = valorBruto * 1.2;
 
-        const valPisAnterior = parseFloat(notaAnterior.val_pis) || 0;
-        const valCofinsAnterior = parseFloat(notaAnterior.val_cofins) || 0;
-        const valCsllAnterior = parseFloat(notaAnterior.val_csll) || 0;
+    const { data: dataR2, error: errorR2 } = await supabase
+      .from("notas_fiscais")
+      .select("*")
+      .eq("empresa_cnpj", rawCnpj)
+      .gte("valor_bruto", minBruto)
+      .lte("valor_bruto", maxBruto)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-        window.aliquotasValidas = {
-          iss: valorIssAnterior / valorBrutoAnterior,
-          inss: valorInssAnterior / valorBrutoAnterior,
-          ir: valorIrAnterior / valorBrutoAnterior,
-          pcc_perfil: (valPisAnterior > 0 || valCofinsAnterior > 0 || valCsllAnterior > 0)
-        };
-
-        // Apply PCC Perfil dynamics right away
-        const chkPis = document.getElementById("chkPis");
-        const iptPisContainer = document.getElementById("iptPisContainer");
-        if (chkPis && iptPisContainer) {
-          if (window.aliquotasValidas.pcc_perfil) {
-            chkPis.checked = true;
-            iptPisContainer.classList.remove("hidden");
-            iptPisContainer.classList.add("flex");
-          } else {
-            chkPis.checked = false;
-            iptPisContainer.classList.add("hidden");
-            iptPisContainer.classList.remove("flex");
-          }
-        }
-
-        console.log("Smart defaults calculados da nota anterior:", window.aliquotasValidas);
-      } else {
-        window.aliquotasValidas = null;
-      }
-    } else {
-      window.aliquotasValidas = null;
+    if (errorR2) {
+      console.error("Erro na busca da Regra 2:", errorR2);
     }
-  } catch (e) {
-    console.error("Erro no processamento das aliquotas historicas:", e);
-    window.aliquotasValidas = null;
+
+    if (dataR2 && dataR2.length > 0) {
+      const nota = dataR2[0];
+      
+      const notaAmostraEncontrada = {
+        valor_bruto: parseFloat(nota.valor_bruto) || 0,
+        valor_inss: parseFloat(nota.inss) || 0,
+        valor_iss: parseFloat(nota.iss) || 0,
+        valor_irrf: parseFloat(nota.ir) || 0,
+        valor_pcc: parseFloat(nota.pis_digitado) || 0,
+        val_pis: parseFloat(nota.val_pis) || 0,
+        val_cofins: parseFloat(nota.val_cofins) || 0,
+        val_csll: parseFloat(nota.val_csll) || 0
+      };
+
+      const resultado = predizerImpostoPorAmostra(valorBruto, notaAmostraEncontrada);
+
+      // Calcular proporcionalmente os impostos internos do PCC se houver
+      if (resultado.pcc > 0 && notaAmostraEncontrada.valor_pcc > 0) {
+        resultado.val_pis = Math.round(((valorBruto * (notaAmostraEncontrada.val_pis / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+        resultado.val_cofins = Math.round(((valorBruto * (notaAmostraEncontrada.val_cofins / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+        resultado.val_csll = Math.round(((valorBruto * (notaAmostraEncontrada.val_csll / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+      } else {
+        resultado.val_pis = 0;
+        resultado.val_cofins = 0;
+        resultado.val_csll = 0;
+      }
+
+      aplicarValoresSugeridos(resultado);
+      return;
+    }
+
+    // REGRA 3 (Fora do Range ou Sem Histórico)
+    aplicarValoresSugeridos({
+      inss: 0,
+      iss: 0,
+      irrf: 0,
+      pcc: 0,
+      val_pis: 0,
+      val_cofins: 0,
+      val_csll: 0
+    });
+
+  } catch (error) {
+    console.error("Erro ao predizer encargos:", error);
   }
+}
+
+let predizerDebounceTimeout = null;
+export function debouncedPredizerEncargos() {
+  clearTimeout(predizerDebounceTimeout);
+  predizerDebounceTimeout = setTimeout(() => {
+    predizerEncargos();
+  }, 400);
+}
+
+export async function carregarSmartDefaults(cnpjRaw) {
+  await predizerEncargos();
 }
