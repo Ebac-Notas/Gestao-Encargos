@@ -440,58 +440,66 @@ export async function enviarNota(overrideParams = null, event = null) {
 
   // Interceptação inteligente do dia de emissão
   if (!overrideParams) {
-    const diaAtual = new Date().getDate();
-    if (diaDigitado > diaAtual) {
-      const modal = getEl("modalInterceptarDia");
-      if (modal) {
-        getEl("interceptarDiaDigitado").innerText = diaDigitado;
-        getEl("interceptarDiaAtual").innerText = diaAtual;
-        modal.classList.remove("hidden");
+    const hoje = new Date();
+    const anoStr = hoje.getFullYear();
+    const mesStr = String(hoje.getMonth() + 1).padStart(2, "0");
+    const refAtual = `${anoStr}-${mesStr}`;
 
-        const btnNao = getEl("btnInterceptarNao");
-        const btnSim = getEl("btnInterceptarSim");
+    // Só aplica a verificação se o usuário estiver com o mês atual selecionado
+    if (refSelecionada === refAtual) {
+      const diaAtual = hoje.getDate();
+      if (diaDigitado > diaAtual) {
+        const modal = getEl("modalInterceptarDia");
+        if (modal) {
+          getEl("interceptarDiaDigitado").innerText = diaDigitado;
+          getEl("interceptarDiaAtual").innerText = diaAtual;
+          modal.classList.remove("hidden");
 
-        btnNao.onclick = () => {
-          modal.classList.add("hidden");
-          window.isSendingNota = false;
-          iptDiaEmissao.focus();
-          iptDiaEmissao.select();
-        };
+          const btnNao = getEl("btnInterceptarNao");
+          const btnSim = getEl("btnInterceptarSim");
 
-        btnSim.onclick = async () => {
-          modal.classList.add("hidden");
-          window.isSendingNota = false; // libere o lock do envio temporariamente para a chamada recursiva
+          btnNao.onclick = () => {
+            modal.classList.add("hidden");
+            window.isSendingNota = false;
+            iptDiaEmissao.focus();
+            iptDiaEmissao.select();
+          };
 
-          const partesRef = refSelecionada.split("-");
-          const statusMeseAnoAtual = parseInt(partesRef[1]) - 1; // 0-11
-          const anoReferencia = parseInt(partesRef[0]);
+          btnSim.onclick = async () => {
+            modal.classList.add("hidden");
+            window.isSendingNota = false; // libere o lock do envio temporariamente para a chamada recursiva
 
-          const hoje = new Date();
-          let anoDestino = anoReferencia || hoje.getFullYear();
-          let mesDestino = statusMeseAnoAtual;
+            const partesRef = refSelecionada.split("-");
+            const statusMeseAnoAtual = parseInt(partesRef[1]) - 1; // 0-11
+            const anoReferencia = parseInt(partesRef[0]);
 
-          // Retrocede para o mês anterior
-          mesDestino = mesDestino - 1;
+            const hoje = new Date();
+            let anoDestino = anoReferencia || hoje.getFullYear();
+            let mesDestino = statusMeseAnoAtual;
 
-          // Tratamento para a virada de ano (Se o sistema estava em Janeiro, o mês destino vira Dezembro do ano anterior)
-          if (mesDestino < 0) {
-            mesDestino = 11;
-            anoDestino -= 1;
-          }
+            // Retrocede para o mês anterior
+            mesDestino = mesDestino - 1;
 
-          // Validação de meses curtos (ex: evitar 30 de fevereiro)
-          const ultimoDiaDoMesAnterior = new Date(anoDestino, mesDestino + 1, 0).getDate();
-          let diaFinal = diaDigitado;
+            // Tratamento para a virada de ano (Se o sistema estava em Janeiro, o mês destino vira Dezembro do ano anterior)
+            if (mesDestino < 0) {
+              mesDestino = 11;
+              anoDestino -= 1;
+            }
 
-          if (diaFinal > ultimoDiaDoMesAnterior) {
-            diaFinal = ultimoDiaDoMesAnterior;
-          }
+            // Validação de meses curtos (ex: evitar 30 de fevereiro)
+            const ultimoDiaDoMesAnterior = new Date(anoDestino, mesDestino + 1, 0).getDate();
+            let diaFinal = diaDigitado;
 
-          // Re-envia com os valores corrigidos
-          await enviarNota({ dia: diaFinal, mes: mesDestino, ano: anoDestino }, event);
-        };
+            if (diaFinal > ultimoDiaDoMesAnterior) {
+              diaFinal = ultimoDiaDoMesAnterior;
+            }
+
+            // Re-envia com os valores corrigidos
+            await enviarNota({ dia: diaFinal, mes: mesDestino, ano: anoDestino }, event);
+          };
+        }
+        return;
       }
-      return;
     }
   }
 
