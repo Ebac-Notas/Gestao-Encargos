@@ -1376,6 +1376,17 @@ export async function verificarAutenticacao() {
   if (rememberedEmail && txtEmail) {
     txtEmail.value = rememberedEmail;
     if (chkLembrarEmail) chkLembrarEmail.checked = true;
+    
+    const txtSenha = getEl("txtSenha");
+    if (txtSenha) {
+      setTimeout(() => {
+        txtSenha.focus();
+      }, 100);
+    }
+  } else if (txtEmail) {
+    setTimeout(() => {
+      txtEmail.focus();
+    }, 100);
   }
 
   return false;
