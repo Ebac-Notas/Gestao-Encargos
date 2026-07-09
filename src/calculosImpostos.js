@@ -296,14 +296,22 @@ export async function predizerEncargos() {
 
     if (dataR1 && dataR1.length > 0) {
       const nota = dataR1[0];
+      const vPis = parseFloat(nota.val_pis) || 0;
+      const vCofins = parseFloat(nota.val_cofins) || 0;
+      const vCsll = parseFloat(nota.val_csll) || 0;
+      let pccVal = parseFloat(nota.pis_digitado) || 0;
+      if (pccVal <= 0 && (vPis > 0 || vCofins > 0 || vCsll > 0)) {
+        pccVal = vPis + vCofins + vCsll;
+      }
+
       aplicarValoresSugeridos({
         inss: parseFloat(nota.inss) || 0,
         iss: parseFloat(nota.iss) || 0,
         irrf: parseFloat(nota.ir) || 0,
-        pcc: parseFloat(nota.pis_digitado) || 0,
-        val_pis: parseFloat(nota.val_pis) || 0,
-        val_cofins: parseFloat(nota.val_cofins) || 0,
-        val_csll: parseFloat(nota.val_csll) || 0
+        pcc: pccVal,
+        val_pis: vPis,
+        val_cofins: vCofins,
+        val_csll: vCsll
       });
       return;
     }
@@ -327,16 +335,23 @@ export async function predizerEncargos() {
 
     if (dataR2 && dataR2.length > 0) {
       const nota = dataR2[0];
+      const vPis = parseFloat(nota.val_pis) || 0;
+      const vCofins = parseFloat(nota.val_cofins) || 0;
+      const vCsll = parseFloat(nota.val_csll) || 0;
+      let pccVal = parseFloat(nota.pis_digitado) || 0;
+      if (pccVal <= 0 && (vPis > 0 || vCofins > 0 || vCsll > 0)) {
+        pccVal = vPis + vCofins + vCsll;
+      }
       
       const notaAmostraEncontrada = {
         valor_bruto: parseFloat(nota.valor_bruto) || 0,
         valor_inss: parseFloat(nota.inss) || 0,
         valor_iss: parseFloat(nota.iss) || 0,
         valor_irrf: parseFloat(nota.ir) || 0,
-        valor_pcc: parseFloat(nota.pis_digitado) || 0,
-        val_pis: parseFloat(nota.val_pis) || 0,
-        val_cofins: parseFloat(nota.val_cofins) || 0,
-        val_csll: parseFloat(nota.val_csll) || 0
+        valor_pcc: pccVal,
+        val_pis: vPis,
+        val_cofins: vCofins,
+        val_csll: vCsll
       };
 
       const resultado = predizerImpostoPorAmostra(valorBruto, notaAmostraEncontrada);
