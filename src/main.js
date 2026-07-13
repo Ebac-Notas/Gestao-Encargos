@@ -1969,17 +1969,220 @@ export function handleAcaoRow(gridName, id, btnObj) {
                 .eq("id", rowEncontrada.id);
 
               let oper = getOperador();
-              await supabase.from("logs_auditoria").insert([
-                {
+              let logs = [];
+
+              // 1. Condomínio
+              const origCond = String(rowEncontrada.codCond || "").trim().toUpperCase();
+              if (origCond !== codCondLimpo) {
+                logs.push({
                   operador: oper,
                   acao: "UPDATE_INVOICE",
                   entidade: codCondLimpo,
                   recurso: cleanNewCnpj,
-                  descricao: `Edição de nota [NF ${numNotaLimpo}] - Valor Original: ${formatMoney(rowEncontrada.valor)} | Novo: ${formatMoney(oBruto)}`,
+                  descricao: `Alteração de condomínio na NF [${numNotaLimpo}]: de [${origCond}] para [${codCondLimpo}]`,
                   referencia: newRef,
                   num_nota: numNotaLimpo,
-                },
-              ]);
+                });
+              }
+
+              // 2. CNPJ
+              const origCnpj = String(rowEncontrada.cnpj || "").replace(/[^\d]+/g, "");
+              if (origCnpj !== cleanNewCnpj) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de CNPJ na NF [${numNotaLimpo}]: de [${origCnpj}] para [${cleanNewCnpj}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 3. Número Nota
+              const origNumNota = String(rowEncontrada.numNota || "").trim();
+              if (origNumNota !== numNotaLimpo) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de número da nota: de [${origNumNota}] para [${numNotaLimpo}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 4. Data Emissão
+              const origData = String(rowEncontrada.dataCompleta || "").trim();
+              const newData = String(props.dataCompleta || "").trim();
+              if (origData !== newData) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de data de emissão na NF [${numNotaLimpo}]: de [${origData}] para [${newData}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 5. Valor Bruto
+              const origValor = Number(rowEncontrada.valor || 0);
+              if (Math.abs(origValor - oBruto) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de Valor Bruto na NF [${numNotaLimpo}]: de [${formatMoney(origValor)}] para [${formatMoney(oBruto)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 6. ISS
+              const origIss = Number(rowEncontrada.iss || 0);
+              if (Math.abs(origIss - oIss) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de ISS na NF [${numNotaLimpo}]: de [${formatMoney(origIss)}] para [${formatMoney(oIss)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 7. INSS
+              const origInss = Number(rowEncontrada.inss || 0);
+              if (Math.abs(origInss - oInss) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de INSS na NF [${numNotaLimpo}]: de [${formatMoney(origInss)}] para [${formatMoney(oInss)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 8. IR
+              const origIr = Number(rowEncontrada.ir || 0);
+              if (Math.abs(origIr - oIr) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de IR na NF [${numNotaLimpo}]: de [${formatMoney(origIr)}] para [${formatMoney(oIr)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 9. PIS
+              const origPis = Number(rowEncontrada.valPIS || 0);
+              if (Math.abs(origPis - oPIS) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de PIS na NF [${numNotaLimpo}]: de [${formatMoney(origPis)}] para [${formatMoney(oPIS)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 10. COFINS
+              const origCofins = Number(rowEncontrada.valCOFINS || 0);
+              if (Math.abs(origCofins - oCOFINS) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de COFINS na NF [${numNotaLimpo}]: de [${formatMoney(origCofins)}] para [${formatMoney(oCOFINS)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 11. CSLL
+              const origCsll = Number(rowEncontrada.valCSLL || 0);
+              if (Math.abs(origCsll - oCSLL) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de CSLL na NF [${numNotaLimpo}]: de [${formatMoney(origCsll)}] para [${formatMoney(oCSLL)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 12. PCC
+              const origPcc = Number(rowEncontrada.pisDigitado || 0);
+              if (Math.abs(origPcc - oPISDigitado) > 0.001) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de PCC na NF [${numNotaLimpo}]: de [${formatMoney(origPcc)}] para [${formatMoney(oPISDigitado)}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 13. Código de Serviço
+              const origCodServ = String(rowEncontrada.codServico || "").trim() || "-";
+              const newCodServ = (props.codServico !== "-" ? props.codServico : null) || "-";
+              if (origCodServ !== newCodServ) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de Código de Serviço na NF [${numNotaLimpo}]: de [${origCodServ}] para [${newCodServ}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              // 14. Status de Serviço
+              const origStatusServ = String(rowEncontrada.statusServico || "").trim() || "-";
+              const newStatusServ = (props.statusServico !== "-" ? props.statusServico : null) || "-";
+              if (origStatusServ !== newStatusServ) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Alteração de Status de Serviço na NF [${numNotaLimpo}]: de [${origStatusServ}] para [${newStatusServ}]`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              if (logs.length === 0) {
+                logs.push({
+                  operador: oper,
+                  acao: "UPDATE_INVOICE",
+                  entidade: codCondLimpo,
+                  recurso: cleanNewCnpj,
+                  descricao: `Edição de nota [NF ${numNotaLimpo}] sem alterações de valores`,
+                  referencia: newRef,
+                  num_nota: numNotaLimpo,
+                });
+              }
+
+              await supabase.from("logs_auditoria").insert(logs);
 
               showToast("Nota editada e salva com sucesso!", "success");
             }
