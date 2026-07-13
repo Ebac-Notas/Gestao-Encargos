@@ -1850,6 +1850,21 @@ export function handleAcaoRow(gridName, id, btnObj) {
           showToast("ISS não pode exceder 10% do Valor Bruto.", "error");
           return;
         }
+
+        // Validar formato e valor de dataCompleta
+        const regexData = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+        if (!props.dataCompleta || !regexData.test(props.dataCompleta.trim())) {
+          showToast("Data de Emissão inválida. Use o formato DD/MM/AAAA.", "error");
+          return;
+        }
+        const [dStr, mStr, yStr] = props.dataCompleta.trim().split("/");
+        const diaVal = parseInt(dStr, 10);
+        const mesVal = parseInt(mStr, 10);
+        const anoVal = parseInt(yStr, 10);
+        if (diaVal < 1 || diaVal > 31 || mesVal < 1 || mesVal > 12 || anoVal < 1900 || anoVal > 2100) {
+          showToast("Data de Emissão inválida.", "error");
+          return;
+        }
       }
 
       (async () => {
@@ -1926,6 +1941,10 @@ export function handleAcaoRow(gridName, id, btnObj) {
                 }
               }
 
+              const parts = props.dataCompleta.trim().split("/");
+              const newDiaEmissao = parseInt(parts[0], 10);
+              const newRef = `${parts[2]}-${parts[1]}`;
+
               await supabase
                 .from("notas_fiscais")
                 .update({
@@ -1933,7 +1952,8 @@ export function handleAcaoRow(gridName, id, btnObj) {
                   empresa_cnpj: cleanNewCnpj,
                   numero_nota: numNotaLimpo,
                   data_consolidada: props.dataCompleta,
-                  referencia: rowEncontrada.referencia,
+                  referencia: newRef,
+                  dia_emissao: newDiaEmissao,
                   valor_bruto: oBruto,
                   iss: oIss,
                   inss: oInss,
@@ -1956,7 +1976,7 @@ export function handleAcaoRow(gridName, id, btnObj) {
                   entidade: codCondLimpo,
                   recurso: cleanNewCnpj,
                   descricao: `Edição de nota [NF ${numNotaLimpo}] - Valor Original: ${formatMoney(rowEncontrada.valor)} | Novo: ${formatMoney(oBruto)}`,
-                  referencia: rowEncontrada.referencia,
+                  referencia: newRef,
                   num_nota: numNotaLimpo,
                 },
               ]);
