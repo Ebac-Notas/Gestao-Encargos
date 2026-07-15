@@ -139,7 +139,7 @@ export function recalcularValorLiquido() {
       ? parseFloat(pisValEl ? pisValEl.value : 0) || 0
       : 0;
 
-  let liquido = bruto - (iss + inss + ir + pcc);
+  let liquido = Math.round((bruto - (iss + inss + ir + pcc) + Number.EPSILON) * 100) / 100;
   lblValorLiquido.innerText = formatMoney(liquido);
 }
 
@@ -300,8 +300,10 @@ export async function predizerEncargos() {
       const vCofins = parseFloat(nota.val_cofins) || 0;
       const vCsll = parseFloat(nota.val_csll) || 0;
       let pccVal = parseFloat(nota.pis_digitado) || 0;
-      if (pccVal <= 0 && (vPis > 0 || vCofins > 0 || vCsll > 0)) {
-        pccVal = vPis + vCofins + vCsll;
+      if (vPis > 0 || vCofins > 0 || vCsll > 0) {
+        pccVal = Math.round((vPis + vCofins + vCsll) * 100) / 100;
+      } else if (pccVal <= 0) {
+        pccVal = 0;
       }
 
       aplicarValoresSugeridos({
@@ -339,8 +341,10 @@ export async function predizerEncargos() {
       const vCofins = parseFloat(nota.val_cofins) || 0;
       const vCsll = parseFloat(nota.val_csll) || 0;
       let pccVal = parseFloat(nota.pis_digitado) || 0;
-      if (pccVal <= 0 && (vPis > 0 || vCofins > 0 || vCsll > 0)) {
-        pccVal = vPis + vCofins + vCsll;
+      if (vPis > 0 || vCofins > 0 || vCsll > 0) {
+        pccVal = Math.round((vPis + vCofins + vCsll) * 100) / 100;
+      } else if (pccVal <= 0) {
+        pccVal = 0;
       }
       
       const notaAmostraEncontrada = {
@@ -361,6 +365,7 @@ export async function predizerEncargos() {
         resultado.val_pis = Math.round(((valorBruto * (notaAmostraEncontrada.val_pis / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
         resultado.val_cofins = Math.round(((valorBruto * (notaAmostraEncontrada.val_cofins / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
         resultado.val_csll = Math.round(((valorBruto * (notaAmostraEncontrada.val_csll / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+        resultado.pcc = Math.round((resultado.val_pis + resultado.val_cofins + resultado.val_csll) * 100) / 100;
       } else {
         resultado.val_pis = 0;
         resultado.val_cofins = 0;
