@@ -2850,6 +2850,39 @@ window.addEventListener("DOMContentLoaded", () => {
   const iptISS = getEl("iptISS");
   const iptINSS = getEl("iptINSS");
   const iptIR = getEl("iptIR");
+  const iptPIS = getEl("iptPIS");
+  const iptCOFINS = getEl("iptCOFINS");
+  const iptCSLL = getEl("iptCSLL");
+  const iptPisVal = getEl("iptPisVal");
+
+  const travarDuasCasasDecimais = (input) => {
+    if (!input) return;
+    input.addEventListener("keydown", function (e) {
+      if (e.key === ",") {
+        this.dataset.lastSeparator = ",";
+      } else if (e.key === ".") {
+        this.dataset.lastSeparator = ".";
+      }
+    });
+    input.addEventListener("input", function () {
+      let val = this.value;
+      if (!val) {
+        delete this.dataset.lastSeparator;
+        return;
+      }
+      if (this.dataset.lastSeparator === ",") {
+        if (val.includes(".")) {
+          const parts = val.split(".");
+          if (parts[1].length > 2) {
+            this.value = parts[0] + "." + parts[1].slice(0, 2);
+          }
+        }
+      }
+    });
+  };
+
+  [iptValorBruto, iptISS, iptINSS, iptIR, iptPIS, iptCOFINS, iptCSLL, iptPisVal].forEach(travarDuasCasasDecimais);
+
   [iptValorBruto, iptISS, iptINSS, iptIR].forEach((input) => {
     if (input) input.addEventListener("input", recalcularValorLiquido);
   });
@@ -2858,10 +2891,10 @@ window.addEventListener("DOMContentLoaded", () => {
       setTimeout(recalcularValorLiquido, 50);
     });
   }
-  if (getEl("iptPIS")) getEl("iptPIS").addEventListener("input", recalcularValorLiquido);
-  if (getEl("iptCOFINS")) getEl("iptCOFINS").addEventListener("input", recalcularValorLiquido);
-  if (getEl("iptCSLL")) getEl("iptCSLL").addEventListener("input", recalcularValorLiquido);
-  if (getEl("iptPisVal")) getEl("iptPisVal").addEventListener("input", recalcularValorLiquido);
+  if (iptPIS) iptPIS.addEventListener("input", recalcularValorLiquido);
+  if (iptCOFINS) iptCOFINS.addEventListener("input", recalcularValorLiquido);
+  if (iptCSLL) iptCSLL.addEventListener("input", recalcularValorLiquido);
+  if (iptPisVal) iptPisVal.addEventListener("input", recalcularValorLiquido);
 
   document.addEventListener("keydown", function (event) {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
