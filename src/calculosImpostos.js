@@ -233,27 +233,86 @@ export function aplicarValoresSugeridos(valores) {
   const elCofins = document.getElementById("iptCOFINS");
   const elCsll = document.getElementById("iptCSLL");
 
-  if (elIss) elIss.value = valores.iss > 0 ? valores.iss.toFixed(2) : "";
-  if (elInss) elInss.value = valores.inss > 0 ? valores.inss.toFixed(2) : "";
-  if (elIr) elIr.value = valores.irrf > 0 ? valores.irrf.toFixed(2) : "";
+  // Função auxiliar para verificar se o campo já tem um valor preenchido de forma válida
+  // (ex: com vírgula/ponto e duas casas decimais, ou simplesmente se o valor foi preenchido pelo usuário).
+  const deveProteger = (el) => {
+    if (!el) return false;
+    const val = el.value.trim();
+    if (!val) return false;
+    
+    // Verifica se possui formato de duas casas decimais (ponto ou vírgula)
+    const regexDuasCasas = /\d+[\.,]\d{2}$/;
+    if (regexDuasCasas.test(val)) {
+      return true;
+    }
+    
+    // Como segurança para campos do tipo number onde o browser pode ocultar as casas decimais de números redondos (ex: "100"),
+    // se o campo possui um valor numérico válido e maior que zero, ele é considerado protegido para não ser sobrescrito pelos smart defaults.
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  if (elIss && !deveProteger(elIss)) {
+    elIss.value = valores.iss > 0 ? valores.iss.toFixed(2) : "";
+    if (valores.iss > 0) elIss.dataset.lastSeparator = ",";
+  }
+  if (elInss && !deveProteger(elInss)) {
+    elInss.value = valores.inss > 0 ? valores.inss.toFixed(2) : "";
+    if (valores.inss > 0) elInss.dataset.lastSeparator = ",";
+  }
+  if (elIr && !deveProteger(elIr)) {
+    elIr.value = valores.irrf > 0 ? valores.irrf.toFixed(2) : "";
+    if (valores.irrf > 0) elIr.dataset.lastSeparator = ",";
+  }
 
   if (chkPis && iptPisContainer) {
     if (valores.pcc > 0) {
       chkPis.checked = true;
       iptPisContainer.classList.remove("hidden");
       iptPisContainer.classList.add("flex");
-      if (elPisVal) elPisVal.value = valores.pcc.toFixed(2);
-      if (elPis) elPis.value = valores.val_pis > 0 ? valores.val_pis.toFixed(2) : "";
-      if (elCofins) elCofins.value = valores.val_cofins > 0 ? valores.val_cofins.toFixed(2) : "";
-      if (elCsll) elCsll.value = valores.val_csll > 0 ? valores.val_csll.toFixed(2) : "";
+      if (elPisVal && !deveProteger(elPisVal)) {
+        elPisVal.value = valores.pcc.toFixed(2);
+        elPisVal.dataset.lastSeparator = ",";
+      }
+      if (elPis && !deveProteger(elPis)) {
+        elPis.value = valores.val_pis > 0 ? valores.val_pis.toFixed(2) : "";
+        if (valores.val_pis > 0) elPis.dataset.lastSeparator = ",";
+      }
+      if (elCofins && !deveProteger(elCofins)) {
+        elCofins.value = valores.val_cofins > 0 ? valores.val_cofins.toFixed(2) : "";
+        if (valores.val_cofins > 0) elCofins.dataset.lastSeparator = ",";
+      }
+      if (elCsll && !deveProteger(elCsll)) {
+        elCsll.value = valores.val_csll > 0 ? valores.val_csll.toFixed(2) : "";
+        if (valores.val_csll > 0) elCsll.dataset.lastSeparator = ",";
+      }
     } else {
-      chkPis.checked = false;
-      iptPisContainer.classList.add("hidden");
-      iptPisContainer.classList.remove("flex");
-      if (elPisVal) elPisVal.value = "";
-      if (elPis) elPis.value = "";
-      if (elCofins) elCofins.value = "";
-      if (elCsll) elCsll.value = "";
+      const algumProtegido = deveProteger(elPisVal) || deveProteger(elPis) || deveProteger(elCofins) || deveProteger(elCsll);
+      if (!algumProtegido) {
+        chkPis.checked = false;
+        iptPisContainer.classList.add("hidden");
+        iptPisContainer.classList.remove("flex");
+        if (elPisVal) {
+          elPisVal.value = "";
+          delete elPisVal.dataset.lastSeparator;
+        }
+        if (elPis) {
+          elPis.value = "";
+          delete elPis.dataset.lastSeparator;
+        }
+        if (elCofins) {
+          elCofins.value = "";
+          delete elCofins.dataset.lastSeparator;
+        }
+        if (elCsll) {
+          elCsll.value = "";
+          delete elCsll.dataset.lastSeparator;
+        }
+      }
     }
   }
 
