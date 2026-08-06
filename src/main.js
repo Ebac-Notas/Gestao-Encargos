@@ -28,7 +28,8 @@ import {
   alternarModoConferencia, 
   debouncedSearchNotas,
   parseLogDate,
-  getNumNotaFromLog
+  getNumNotaFromLog,
+  alterarQtdeExibicao
 } from "./filtrosInterface.js";
 
 // --- GLOBAL STATE INITIALIZATION ---
@@ -46,7 +47,8 @@ window.cnpjPendingTimeout = null;
 window.tempUf = null;
 window.ultimoCnpjProcessado = "";
 window.paginaAtualNotas = 1;
-window.itensPorPaginaNotas = 50;
+window.qtdeExibicaoNotas = localStorage.getItem("qtdeExibicaoNotas") || "20";
+window.itensPorPaginaNotas = window.qtdeExibicaoNotas === "50" ? 50 : (window.qtdeExibicaoNotas === "todos" ? 999999 : 20);
 window.notasFiltradasAtivas = [];
 window.sortState = {
   notas: { col: "", asc: true },
@@ -86,6 +88,7 @@ window.renderCondominios = renderCondominios;
 window.renderAuditoria = renderAuditoria;
 window.alternarModoConferencia = alternarModoConferencia;
 window.debouncedSearchNotas = debouncedSearchNotas;
+window.alterarQtdeExibicao = alterarQtdeExibicao;
 window.buscarCnpjBrasilApi = buscarCnpjBrasilApi;
 
 window.validarERecarregarCnpj = validarERecarregarCnpj;
@@ -2846,6 +2849,11 @@ window.addEventListener("DOMContentLoaded", () => {
     elIptReferenciaInterna.value = `${anoStr}-${mesStr}`;
   }
 
+  const elSelQtdeExibicao = getEl("selQtdeExibicao");
+  if (elSelQtdeExibicao) {
+    elSelQtdeExibicao.value = window.qtdeExibicaoNotas || "20";
+  }
+
   const iptValorBruto = getEl("iptValorBruto");
   const iptISS = getEl("iptISS");
   const iptINSS = getEl("iptINSS");
@@ -3619,6 +3627,17 @@ window.addEventListener("DOMContentLoaded", () => {
     iptValorBruto.addEventListener("input", function () {
       debouncedPredizerEncargos();
     });
+    iptValorBruto.addEventListener("keydown", function (e) {
+      if ((e.key === "Tab" || e.key === "Enter") && !e.shiftKey) {
+        const iptISS = getEl("iptISS");
+        if (iptISS && iptISS.disabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.deveFocarNoIssAposCarregamento = true;
+          this.blur();
+        }
+      }
+    });
   }
 
   document.addEventListener("click", (e) => {
@@ -3801,7 +3820,12 @@ window.conferirNotasLote = conferirNotasLote;
 
 export function mudarPaginaNotas(direcao) {
   const totItens = window.notasFiltradasAtivas ? window.notasFiltradasAtivas.length : 0;
-  const itemsPerPage = window.itensPorPaginaNotas || 50;
+  const qtdeConfig = window.qtdeExibicaoNotas || "20";
+  let itemsPerPage = 20;
+  if (qtdeConfig === "50") itemsPerPage = 50;
+  else if (qtdeConfig === "todos") itemsPerPage = Math.max(totItens, 1);
+  else itemsPerPage = window.itensPorPaginaNotas || 20;
+
   const totPaginas = Math.ceil(totItens / itemsPerPage) || 1;
   const novaPagina = window.paginaAtualNotas + direcao;
 
