@@ -648,9 +648,22 @@
             class="h-7 bg-slate-200 border-t border-slate-300 flex items-center px-4 shrink-0 text-[10px] text-slate-600 font-medium justify-between font-bold"
           >
             <div class="flex items-center gap-2">
-              <span class="mr-2">PRONTO</span>
+              <span>PRONTO</span>
               <span class="text-slate-400">|</span>
-              <span class="font-mono font-bold ml-2" id="qtdeNotas">TOTAL REGISTROS: 0</span>
+              <span class="font-mono font-bold" id="qtdeNotas">TOTAL REGISTROS: 0</span>
+              <span class="text-slate-400">|</span>
+              <div class="flex items-center gap-1.5 ml-1">
+                <label for="selQtdeExibicao" class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Exibir:</label>
+                <select
+                  id="selQtdeExibicao"
+                  onchange="window.alterarQtdeExibicao(this.value)"
+                  class="bg-white border border-slate-300 text-slate-700 text-[10px] font-bold rounded px-1.5 py-0.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer h-[20px]"
+                >
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="todos">Todos (do mês)</option>
+                </select>
+              </div>
             </div>
             
             <!-- Controle Interativo de tamanho de fonte -->
