@@ -245,7 +245,7 @@ export function obterRowHtml(n) {
 
   // Leftmost column for checkbox
   let colConferirHtml = window.modoConferencia
-    ? `<td class="p-2 text-center border-r border-slate-200 bg-slate-100 col-conferir-cell" onclick="event.stopPropagation()">
+    ? `<td class="p-2 text-center border-r border-slate-200 col-conferir-cell" onclick="event.stopPropagation()">
         <input type="checkbox" class="chk-conferir rounded text-emerald-600 border-slate-300 focus:ring-0 cursor-pointer" data-id="${n.id}">
        </td>`
     : `<td class="col-conferir-cell" style="display: none;"></td>`;
@@ -257,7 +257,7 @@ export function obterRowHtml(n) {
   return `
     <tr class="${rowBgClass}" ${rowStyle} data-id="${n.id}" ondblclick="window.startEditRow('notas', '${uniqueId}', this, event)">
       ${colConferirHtml}
-      <td class="p-2 text-center font-mono font-bold text-slate-600 bg-slate-100 border-r border-slate-200 editable-cell" data-prop="codCond">${n.codCond}</td>
+      <td class="p-2 text-center font-mono font-bold text-slate-600 border-r border-slate-200 editable-cell" data-prop="codCond">${n.codCond}</td>
       <td class="p-2 font-medium truncate max-w-xs border-r border-slate-200" data-prop="nomeCond">${n.nomeCond}</td>
       <td class="p-2 truncate font-mono text-slate-700 max-w-xs border-r border-slate-200 editable-cell" data-prop="cnpj">${mascararCNPJ(n.cnpj)}</td>
       <td class="p-2 truncate max-w-sm border-r border-slate-200" data-prop="nomeEmp">${displayNomeEmp}</td>
@@ -267,7 +267,7 @@ export function obterRowHtml(n) {
       <td class="p-2 text-right font-mono text-red-600 border-r border-slate-200 editable-cell" data-prop="iss">${formatMoney(n.iss)}</td>
       <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" data-prop="inss">${formatMoney(n.inss)}</td>
       <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" data-prop="ir">${formatMoney(n.ir)}</td>
-      <td class="p-2 text-right font-mono font-bold text-slate-800 bg-slate-100 border-r border-slate-200 editable-cell" data-prop="pisDigitado">${formatMoney(n.pisDigitado || 0)}</td>
+      <td class="p-2 text-right font-mono font-bold text-slate-800 border-r border-slate-200 editable-cell" data-prop="pisDigitado">${formatMoney(n.pisDigitado || 0)}</td>
       <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" data-prop="valPIS">${formatMoney(n.valPIS || 0)}</td>
       <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" data-prop="valCOFINS">${formatMoney(n.valCOFINS || 0)}</td>
       <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" data-prop="valCSLL">${formatMoney(n.valCSLL || 0)}</td>
@@ -463,59 +463,69 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
   window.notasFiltradasAtivas = [...filtradas];
   const totalNotasFiltradasOriginal = filtradas.length;
 
+  const qtdeConfig = window.qtdeExibicaoNotas || "20";
+  let itemsPerPage = 20;
+  if (qtdeConfig === "50") {
+    itemsPerPage = 50;
+  } else if (qtdeConfig === "todos") {
+    itemsPerPage = Math.max(totalNotasFiltradasOriginal, 1);
+  } else if (qtdeConfig === "20") {
+    itemsPerPage = 20;
+  } else {
+    itemsPerPage = window.itensPorPaginaNotas || 20;
+  }
+  window.itensPorPaginaNotas = itemsPerPage;
+
   // Apply limit or pagination
   const paginacaoDiv = document.getElementById("paginacaoNotas");
-  if (window.modoConferencia) {
-    const itemsPerPage = window.itensPorPaginaNotas || 50;
-    const paginasTotais = Math.ceil(totalNotasFiltradasOriginal / itemsPerPage) || 1;
-    
-    // Bounds checker
-    if (window.paginaAtualNotas > paginasTotais) {
-      window.paginaAtualNotas = paginasTotais;
-    }
-    if (window.paginaAtualNotas < 1) {
-      window.paginaAtualNotas = 1;
-    }
+  const paginasTotais = Math.ceil(totalNotasFiltradasOriginal / itemsPerPage) || 1;
+  
+  // Bounds checker
+  if (window.paginaAtualNotas > paginasTotais) {
+    window.paginaAtualNotas = paginasTotais;
+  }
+  if (window.paginaAtualNotas < 1) {
+    window.paginaAtualNotas = 1;
+  }
 
-    const startIdx = (window.paginaAtualNotas - 1) * itemsPerPage;
-    const endIdx = Math.min(startIdx + itemsPerPage, totalNotasFiltradasOriginal);
+  const startIdx = (window.paginaAtualNotas - 1) * itemsPerPage;
+  const endIdx = Math.min(startIdx + itemsPerPage, totalNotasFiltradasOriginal);
 
-    filtradas = filtradas.slice(startIdx, endIdx);
+  filtradas = filtradas.slice(startIdx, endIdx);
 
-    // Update Pagination controls
-    if (paginacaoDiv) {
+  // Update Pagination controls
+  if (paginacaoDiv) {
+    if (paginasTotais > 1) {
       paginacaoDiv.classList.remove("hidden");
-      const pagSurgindoInfo = document.getElementById("pagSurgindoInfo");
-      const pagTotalInfo = document.getElementById("pagTotalInfo");
-      const pagAtualText = document.getElementById("pagAtual");
-      const pagTotalText = document.getElementById("pagTotal");
-      const btnPrev = document.getElementById("btnPagAnterior");
-      const btnNext = document.getElementById("btnPagProxima");
-      
-      if (pagSurgindoInfo) {
-        pagSurgindoInfo.innerText = totalNotasFiltradasOriginal > 0 ? `${startIdx + 1} - ${endIdx}` : "0 - 0";
-      }
-      if (pagTotalInfo) {
-        pagTotalInfo.innerText = totalNotasFiltradasOriginal;
-      }
-      if (pagAtualText) {
-        pagAtualText.innerText = window.paginaAtualNotas;
-      }
-      if (pagTotalText) {
-        pagTotalText.innerText = paginasTotais;
-      }
-      if (btnPrev) {
-        btnPrev.disabled = window.paginaAtualNotas <= 1;
-      }
-      if (btnNext) {
-        btnNext.disabled = window.paginaAtualNotas >= paginasTotais;
-      }
-    }
-  } else {
-    if (paginacaoDiv) {
+    } else {
       paginacaoDiv.classList.add("hidden");
     }
-    filtradas = filtradas.slice(0, 20);
+
+    const pagSurgindoInfo = document.getElementById("pagSurgindoInfo");
+    const pagTotalInfo = document.getElementById("pagTotalInfo");
+    const pagAtualText = document.getElementById("pagAtual");
+    const pagTotalText = document.getElementById("pagTotal");
+    const btnPrev = document.getElementById("btnPagAnterior");
+    const btnNext = document.getElementById("btnPagProxima");
+    
+    if (pagSurgindoInfo) {
+      pagSurgindoInfo.innerText = totalNotasFiltradasOriginal > 0 ? `${startIdx + 1} - ${endIdx}` : "0 - 0";
+    }
+    if (pagTotalInfo) {
+      pagTotalInfo.innerText = totalNotasFiltradasOriginal;
+    }
+    if (pagAtualText) {
+      pagAtualText.innerText = window.paginaAtualNotas;
+    }
+    if (pagTotalText) {
+      pagTotalText.innerText = paginasTotais;
+    }
+    if (btnPrev) {
+      btnPrev.disabled = window.paginaAtualNotas <= 1;
+    }
+    if (btnNext) {
+      btnNext.disabled = window.paginaAtualNotas >= paginasTotais;
+    }
   }
 
   // Render on table grid (using the optimized obterRowHtml helper)
@@ -539,8 +549,13 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
         `MODO DE CONFERÊNCIA | TOTAL REGISTROS: ${totalNotasFiltradasOriginal}`;
     } else {
       labelEl.innerText =
-        `EXIBINDO REGISTROS MAIS RECENTES (MÁXIMO 20) | TOTAL: ${totalNotasFiltradasOriginal}`;
+        `TOTAL REGISTROS: ${totalNotasFiltradasOriginal}`;
     }
+  }
+
+  const selQtde = document.getElementById("selQtdeExibicao");
+  if (selQtde && selQtde.value !== qtdeConfig) {
+    selQtde.value = qtdeConfig;
   }
 }
 
@@ -815,4 +830,21 @@ export function debouncedSearchNotas() {
   searchDebounceTimeout = setTimeout(() => {
     renderNotas(false);
   }, 300);
+}
+
+export function alterarQtdeExibicao(valor) {
+  window.qtdeExibicaoNotas = valor || "20";
+  try {
+    localStorage.setItem("qtdeExibicaoNotas", window.qtdeExibicaoNotas);
+  } catch (e) {}
+
+  if (valor === "20") {
+    window.itensPorPaginaNotas = 20;
+  } else if (valor === "50") {
+    window.itensPorPaginaNotas = 50;
+  } else if (valor === "todos") {
+    window.itensPorPaginaNotas = 999999;
+  }
+  window.paginaAtualNotas = 1;
+  renderNotas(false);
 }
