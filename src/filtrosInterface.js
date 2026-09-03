@@ -215,20 +215,26 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
           let isIssConferida = false;
           let isFederaisConferida = false;
 
-          if (n.conferida_iss !== undefined && n.conferida_iss !== null) {
-            isIssConferida = !!n.conferida_iss;
-          } else if (confMap[idKey]) {
-            isIssConferida = !!confMap[idKey].iss;
-          } else if (n.conferida) {
+          if (n.conferida && (!n.conferida_iss && !n.conferida_federais)) {
+            // Nota conferida pelo sistema anterior antes da divisão dos tributos
             isIssConferida = true;
-          }
-
-          if (n.conferida_federais !== undefined && n.conferida_federais !== null) {
-            isFederaisConferida = !!n.conferida_federais;
-          } else if (confMap[idKey]) {
-            isFederaisConferida = !!confMap[idKey].federais;
-          } else if (n.conferida) {
             isFederaisConferida = true;
+          } else {
+            if (n.conferida_iss !== undefined && n.conferida_iss !== null) {
+              isIssConferida = !!n.conferida_iss;
+            } else if (confMap[idKey]) {
+              isIssConferida = !!confMap[idKey].iss;
+            } else if (n.conferida) {
+              isIssConferida = true;
+            }
+
+            if (n.conferida_federais !== undefined && n.conferida_federais !== null) {
+              isFederaisConferida = !!n.conferida_federais;
+            } else if (confMap[idKey]) {
+              isFederaisConferida = !!confMap[idKey].federais;
+            } else if (n.conferida) {
+              isFederaisConferida = true;
+            }
           }
 
           return {
