@@ -29,7 +29,8 @@ import {
   debouncedSearchNotas,
   parseLogDate,
   getNumNotaFromLog,
-  alterarQtdeExibicao
+  alterarQtdeExibicao,
+  setNoteConferenceStatus
 } from "./filtrosInterface.js";
 
 // --- GLOBAL STATE INITIALIZATION ---
@@ -3730,84 +3731,146 @@ export function selecionarTodasNotas(checked) {
 }
 window.selecionarTodasNotas = selecionarTodasNotas;
 
-export async function conferirNotasLote() {
+export async function conferirNotasLote(tipo = "iss") {
   const checkboxes = Array.from(document.querySelectorAll(".chk-conferir"));
   const checkedBoxes = checkboxes.filter((cb) => cb.checked);
   
   if (checkedBoxes.length === 0) {
-    showToast("Nenhuma nota selecionada. Marque os checkboxes das notas que deseja alterar.", "warning");
+    showToast("Nenhuma nota selecionada. Marque os checkboxes das notas que deseja conferir.", "warning");
     return;
   }
 
-  showToast("Processando alterações...", "info");
+  const nomeTipo = tipo === "iss" ? "ISS" : "Impostos Federais";
+  showToast(`Processando conferência de ${nomeTipo}...`, "info");
   window.isBatchUpdating = true;
 
-  const promessas = [];
-  
+  const dbNotasArray = Array.isArray(window.dbNotas) ? window.dbNotas : [];
+  const notasDoMesArray = Array.isArray(window.notasDoMes) ? window.notasDoMes : [];
+
+  // Determine toggle direction: if ANY note is not yet checked for this tax type, mark all as true
+  let anyUnchecked = false;
   checkedBoxes.forEach((cb) => {
     const idNota = cb.getAttribute("data-id");
-    
-    // Find matching note in our local cache to determine current status
-    const dbNotasArray = Array.isArray(window.dbNotas) ? window.dbNotas : [];
-    const notasDoMesArray = Array.isArray(window.notasDoMes) ? window.notasDoMes : [];
-    
     const notaDb = dbNotasArray.find(n => String(n.id) === String(idNota));
-    const currentStatus = notaDb ? !!notaDb.conferida : false;
-    // Toggle (reverse) the status!
-    const newStatus = !currentStatus;
+    if (tipo === "iss") {
+      if (!notaDb || !notaDb.conferida_iss) anyUnchecked = true;
+    } else {
+      if (!notaDb || !notaDb.conferida_federais) anyUnchecked = true;
+    }
+  });
+
+  const newStatus = anyUnchecked;
+  const promessas = [];
+  const logsParaInserir = [];
+  let oper = typeof getOperador === "function" ? getOperador() : "Operador";
+
+  checkedBoxes.forEach((cb) => {
+    const idNota = cb.getAttribute("data-id");
+
+    // Persist in local storage helper
+    setNoteConferenceStatus(idNota, tipo, newStatus);
+
+    // Update in-memory objects
+    const notaDb = dbNotasArray.find(n => String(n.id) === String(idNota));
+    const notaMem = notasDoMesArray.find(n => String(n.id) === String(idNota));
+
+    if (notaDb) {
+      if (tipo === "iss") {
+        notaDb.conferida_iss = newStatus;
+      } else {
+        notaDb.conferida_federais = newStatus;
+      }
+      notaDb.conferida = !!(notaDb.conferida_iss && notaDb.conferida_federais);
+    }
+    if (notaMem) {
+      if (tipo === "iss") {
+        notaMem.conferida_iss = newStatus;
+      } else {
+        notaMem.conferida_federais = newStatus;
+      }
+      notaMem.conferida = !!(notaMem.conferida_iss && notaMem.conferida_federais);
+    }
+
+    const confIss = notaDb ? !!notaDb.conferida_iss : false;
+    const confFed = notaDb ? !!notaDb.conferida_federais : false;
+    const confTotal = confIss && confFed;
+    const numNota = notaDb ? notaDb.numNota : "";
+    const cnpj = notaDb ? notaDb.cnpj : "";
+    const ref = notaDb ? notaDb.referencia : "";
 
     // Immediate visual styling feedback
     const tr = cb.closest("tr");
     if (tr) {
-      if (newStatus) {
+      if (confTotal) {
         tr.className = "hover:bg-green-250 transition-colors cursor-pointer bg-green-100";
-        tr.style.backgroundColor = "#bbf7d0"; // Beautiful soft-mid green, darker than before (#bbf7d0 is distinct and legible)
+        tr.style.backgroundColor = "#bbf7d0";
       } else {
         tr.className = "hover:bg-blue-50 transition-colors cursor-pointer bg-white";
         tr.style.backgroundColor = "";
       }
-    }
 
-    // Update state objects instantly in memory
-    const notaMem = notasDoMesArray.find(n => String(n.id) === String(idNota));
-    if (notaMem) {
-      notaMem.conferida = newStatus;
-    }
-    if (notaDb) {
-      notaDb.conferida = newStatus;
+      // Update ISS cell
+      const tdIss = tr.querySelector('[data-prop="iss"]');
+      if (tdIss) {
+        if (confIss && !confTotal) {
+          tdIss.style.backgroundColor = "#bbf7d0";
+          tdIss.title = "ISS Conferido";
+        } else if (!confTotal) {
+          tdIss.style.backgroundColor = "";
+          tdIss.removeAttribute("title");
+        }
+      }
+
+      // Update Federal Taxes cells
+      const fedCells = tr.querySelectorAll('[data-prop="inss"], [data-prop="ir"], [data-prop="pisDigitado"], [data-prop="valPIS"], [data-prop="valCOFINS"], [data-prop="valCSLL"]');
+      fedCells.forEach((cell) => {
+        if (confFed && !confTotal) {
+          cell.style.backgroundColor = "#bbf7d0";
+          cell.title = "Impostos Federais Conferidos";
+        } else if (!confTotal) {
+          cell.style.backgroundColor = "";
+          cell.removeAttribute("title");
+        }
+      });
     }
 
     // Call Supabase update operation
     promessas.push(
-      atualizarStatusConferida(idNota, newStatus).then((success) => {
+      atualizarStatusConferida(idNota, confTotal, tipo, newStatus).then((success) => {
         if (!success) {
-          console.error(`Falha ao registrar status "conferida=${newStatus}" para nota ID ${idNota}`);
+          console.error(`Falha ao registrar status de conferência para nota ID ${idNota}`);
         }
       })
     );
+
+    logsParaInserir.push({
+      operador: oper,
+      acao: tipo === "iss"
+        ? (newStatus ? "CONFERIR_ISS" : "DESCONFERIR_ISS")
+        : (newStatus ? "CONFERIR_FEDERAIS" : "DESCONFERIR_FEDERAIS"),
+      entidade: `Nota #${numNota}`,
+      recurso: `ID_${idNota}`,
+      descricao: `Conferência de ${nomeTipo} definida como [${newStatus ? "CONFERIDO" : "PENDENTE"}] na NF [${numNota}] - CNPJ ${cnpj}`,
+      referencia: ref || ""
+    });
   });
 
   try {
     await Promise.all(promessas);
     
-    let oper = typeof getOperador === "function" ? getOperador() : "Operador";
-    await supabase.from("logs_auditoria").insert([
-      {
-        operador: oper,
-        acao: "CONFERIR_NOTAS",
-        entidade: `${checkedBoxes.length} registros`,
-        recurso: "Modulação de Status por Lote",
-        descricao: `Lote de ${checkedBoxes.length} notas processadas com sucesso.`
-      }
-    ]);
+    if (logsParaInserir.length > 0 && supabase) {
+      await supabase.from("logs_auditoria").insert(logsParaInserir);
+    }
     
-    showToast(`Sucesso! ${checkedBoxes.length} notas alteradas no banco de dados.`, "success");
+    showToast(
+      `Conferência de ${nomeTipo} ${newStatus ? "concluída" : "removida"} para ${checkedBoxes.length} nota(s).`,
+      "success"
+    );
   } catch (error) {
     console.error("Erro ao registrar conferências:", error);
     showToast("Erro ao processar as alterações de conferência.", "error");
   } finally {
     window.isBatchUpdating = false;
-    // Single render call to refresh list state and keep UI perfectly updated
     if (typeof renderNotas === "function") {
       await renderNotas(false);
     }
@@ -3816,7 +3879,15 @@ export async function conferirNotasLote() {
     }
   }
 }
+export async function conferirISS() {
+  return conferirNotasLote("iss");
+}
+export async function conferirFederais() {
+  return conferirNotasLote("federais");
+}
 window.conferirNotasLote = conferirNotasLote;
+window.conferirISS = conferirISS;
+window.conferirFederais = conferirFederais;
 
 export function mudarPaginaNotas(direcao) {
   const totItens = window.notasFiltradasAtivas ? window.notasFiltradasAtivas.length : 0;
