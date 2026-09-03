@@ -51,6 +51,45 @@ export function showToast(message, type = "info") {
   }, 5000);
 }
 
+// --- CONFERENCIA STATE STORAGE & PERSISTENCE ---
+const CONF_STORAGE_KEY = "conferencia_notas_detalhada_v2";
+
+export function getConferenceStateMap() {
+  try {
+    const raw = localStorage.getItem(CONF_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function saveConferenceStateMap(map) {
+  try {
+    localStorage.setItem(CONF_STORAGE_KEY, JSON.stringify(map));
+  } catch (e) {}
+}
+
+export function setNoteConferenceStatus(idNota, tipo, status) {
+  const map = getConferenceStateMap();
+  const idKey = String(idNota);
+  if (!map[idKey]) {
+    const n = (window.dbNotas || []).find((x) => String(x.id) === idKey);
+    map[idKey] = {
+      iss: n ? !!n.conferida_iss : false,
+      federais: n ? !!n.conferida_federais : false,
+    };
+  }
+  if (tipo === "iss") {
+    map[idKey].iss = !!status;
+  } else if (tipo === "federais") {
+    map[idKey].federais = !!status;
+  }
+  saveConferenceStateMap(map);
+  return map[idKey];
+}
+window.getConferenceStateMap = getConferenceStateMap;
+window.setNoteConferenceStatus = setNoteConferenceStatus;
+
 // --- SORTS & DATA STATES ---
 export function sortGrid(gridName, col) {
   if (gridName === "notes") {
@@ -153,6 +192,8 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
               cod_servico,
               status_servico,
               conferida,
+              conferida_iss,
+              conferida_federais,
               condominios(razao_social),
               empresas(razao_social)
           `,
@@ -168,38 +209,63 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
       const { data } = await query.order("created_at", { ascending: false });
 
       if (data) {
-        window.dbNotas = data.map((n) => ({
-          id: n.id,
-          codCond: n.condominio_codigo,
-          nomeCond: n.condominios
-            ? n.condominios.razao_social
-            : "CONDOMÍNIO DESCONHECIDO",
-          cnpj: n.empresa_cnpj,
-          nomeEmp: n.empresas
-            ? n.empresas.razao_social
-            : "EMPRESA DESCONHECIDA",
-          numNota: n.numero_nota,
-          dataCompleta: n.data_consolidada,
-          referencia: n.referencia,
-          valor: Number(n.valor_bruto),
-          iss: Number(n.iss),
-          inss: Number(n.inss),
-          ir: Number(n.ir),
-          pisDigitado: (n.pis_digitado !== null && Number(n.pis_digitado) > 0)
-            ? Number(n.pis_digitado)
-            : (Number(n.val_pis || 0) + Number(n.val_cofins || 0) + Number(n.val_csll || 0)),
-          valPIS: Number(n.val_pis),
-          valCOFINS: Number(n.val_cofins),
-          valCSLL: Number(n.val_csll),
-          operador: n.criado_por,
-          dataHora: n.created_at
-            ? formatDateTime(new Date(n.created_at))
-            : "",
-          outroMunicipio: !!n.outro_municipio,
-          codServico: n.cod_servico || "",
-          statusServico: n.status_servico || "",
-          conferida: !!n.conferida,
-        }));
+        const confMap = getConferenceStateMap();
+        window.dbNotas = data.map((n) => {
+          const idKey = String(n.id);
+          let isIssConferida = false;
+          let isFederaisConferida = false;
+
+          if (n.conferida_iss !== undefined && n.conferida_iss !== null) {
+            isIssConferida = !!n.conferida_iss;
+          } else if (confMap[idKey]) {
+            isIssConferida = !!confMap[idKey].iss;
+          } else if (n.conferida) {
+            isIssConferida = true;
+          }
+
+          if (n.conferida_federais !== undefined && n.conferida_federais !== null) {
+            isFederaisConferida = !!n.conferida_federais;
+          } else if (confMap[idKey]) {
+            isFederaisConferida = !!confMap[idKey].federais;
+          } else if (n.conferida) {
+            isFederaisConferida = true;
+          }
+
+          return {
+            id: n.id,
+            codCond: n.condominio_codigo,
+            nomeCond: n.condominios
+              ? n.condominios.razao_social
+              : "CONDOMÍNIO DESCONHECIDO",
+            cnpj: n.empresa_cnpj,
+            nomeEmp: n.empresas
+              ? n.empresas.razao_social
+              : "EMPRESA DESCONHECIDA",
+            numNota: n.numero_nota,
+            dataCompleta: n.data_consolidada,
+            referencia: n.referencia,
+            valor: Number(n.valor_bruto),
+            iss: Number(n.iss),
+            inss: Number(n.inss),
+            ir: Number(n.ir),
+            pisDigitado: (n.pis_digitado !== null && Number(n.pis_digitado) > 0)
+              ? Number(n.pis_digitado)
+              : (Number(n.val_pis || 0) + Number(n.val_cofins || 0) + Number(n.val_csll || 0)),
+            valPIS: Number(n.val_pis),
+            valCOFINS: Number(n.val_cofins),
+            valCSLL: Number(n.val_csll),
+            operador: n.criado_por,
+            dataHora: n.created_at
+              ? formatDateTime(new Date(n.created_at))
+              : "",
+            outroMunicipio: !!n.outro_municipio,
+            codServico: n.cod_servico || "",
+            statusServico: n.status_servico || "",
+            conferida: isIssConferida && isFederaisConferida,
+            conferida_iss: isIssConferida,
+            conferida_federais: isFederaisConferida,
+          };
+        });
         window.notasDoMes = [...window.dbNotas];
       }
     }
@@ -209,6 +275,46 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
         .select("*")
         .order("created_at", { ascending: false });
       if (data) {
+        // Sync conference actions from audit logs across devices
+        const confMap = getConferenceStateMap();
+        let changed = false;
+        const chronLogs = [...data].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        for (const l of chronLogs) {
+          if (l.recurso && l.recurso.startsWith("ID_")) {
+            const idKey = l.recurso.replace("ID_", "");
+            if (!confMap[idKey]) {
+              confMap[idKey] = { iss: false, federais: false };
+            }
+            if (l.acao === "CONFERIR_ISS") { confMap[idKey].iss = true; changed = true; }
+            if (l.acao === "DESCONFERIR_ISS") { confMap[idKey].iss = false; changed = true; }
+            if (l.acao === "CONFERIR_FEDERAIS") { confMap[idKey].federais = true; changed = true; }
+            if (l.acao === "DESCONFERIR_FEDERAIS") { confMap[idKey].federais = false; changed = true; }
+          }
+        }
+        if (changed) {
+          saveConferenceStateMap(confMap);
+          if (Array.isArray(window.dbNotas)) {
+            window.dbNotas.forEach((nota) => {
+              const idKey = String(nota.id);
+              if (confMap[idKey]) {
+                nota.conferida_iss = !!confMap[idKey].iss;
+                nota.conferida_federais = !!confMap[idKey].federais;
+                nota.conferida = !!(nota.conferida_iss && nota.conferida_federais);
+              }
+            });
+          }
+          if (Array.isArray(window.notasDoMes)) {
+            window.notasDoMes.forEach((nota) => {
+              const idKey = String(nota.id);
+              if (confMap[idKey]) {
+                nota.conferida_iss = !!confMap[idKey].iss;
+                nota.conferida_federais = !!confMap[idKey].federais;
+                nota.conferida = !!(nota.conferida_iss && nota.conferida_federais);
+              }
+            });
+          }
+        }
+
         window.dbAuditoria = data.map((l) => ({
           id: l.id,
           dataHora: l.created_at
@@ -235,13 +341,21 @@ export function obterRowHtml(n) {
   );
   let displayNomeEmp = e ? e.nome : n.nomeEmp;
 
-  // Dynamic row background for checked notes (using distinct #bbf7d0 green for checked notes)
+  const confIss = !!n.conferida_iss;
+  const confFed = !!n.conferida_federais;
+  const confTotal = confIss && confFed;
+
+  // Dynamic row background for fully checked notes
   let rowBgClass = "hover:bg-blue-50 transition-colors cursor-pointer bg-white";
   let rowStyle = "";
-  if (n.conferida) {
+  if (confTotal) {
     rowBgClass = "hover:bg-green-250 transition-colors cursor-pointer bg-green-100";
     rowStyle = 'style="background-color: #bbf7d0;"';
   }
+
+  // Dynamic cell background for partial conference
+  const issStyle = (confIss && !confTotal) ? 'style="background-color: #bbf7d0;" title="ISS Conferido"' : '';
+  const fedStyle = (confFed && !confTotal) ? 'style="background-color: #bbf7d0;" title="Impostos Federais Conferidos"' : '';
 
   // Leftmost column for checkbox
   let colConferirHtml = window.modoConferencia
@@ -264,13 +378,13 @@ export function obterRowHtml(n) {
       <td class="p-2 text-center font-mono text-slate-800 font-bold border-r border-slate-200 editable-cell" data-prop="numNota">${n.numNota}</td>
       <td class="p-2 text-center text-slate-600 border-r border-slate-200 editable-cell" data-prop="dataCompleta">${n.dataCompleta}</td>
       <td class="p-2 text-right font-mono font-bold text-emerald-700 border-r border-slate-200 editable-cell" data-prop="valor">${formatMoney(n.valor)}</td>
-      <td class="p-2 text-right font-mono text-red-600 border-r border-slate-200 editable-cell" data-prop="iss">${formatMoney(n.iss)}</td>
-      <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" data-prop="inss">${formatMoney(n.inss)}</td>
-      <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" data-prop="ir">${formatMoney(n.ir)}</td>
-      <td class="p-2 text-right font-mono font-bold text-slate-800 border-r border-slate-200 editable-cell" data-prop="pisDigitado">${formatMoney(n.pisDigitado || 0)}</td>
-      <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" data-prop="valPIS">${formatMoney(n.valPIS || 0)}</td>
-      <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" data-prop="valCOFINS">${formatMoney(n.valCOFINS || 0)}</td>
-      <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" data-prop="valCSLL">${formatMoney(n.valCSLL || 0)}</td>
+      <td class="p-2 text-right font-mono text-red-600 border-r border-slate-200 editable-cell" ${issStyle} data-prop="iss">${formatMoney(n.iss)}</td>
+      <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" ${fedStyle} data-prop="inss">${formatMoney(n.inss)}</td>
+      <td class="p-2 text-right font-mono text-slate-600 border-r border-slate-200 editable-cell" ${fedStyle} data-prop="ir">${formatMoney(n.ir)}</td>
+      <td class="p-2 text-right font-mono font-bold text-slate-800 border-r border-slate-200 editable-cell" ${fedStyle} data-prop="pisDigitado">${formatMoney(n.pisDigitado || 0)}</td>
+      <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" ${fedStyle} data-prop="valPIS">${formatMoney(n.valPIS || 0)}</td>
+      <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" ${fedStyle} data-prop="valCOFINS">${formatMoney(n.valCOFINS || 0)}</td>
+      <td class="p-2 text-right font-mono text-[11px] text-slate-500 border-r border-slate-200 col-pcc-det ${pccHiddenClass} editable-cell" ${fedStyle} data-prop="valCSLL">${formatMoney(n.valCSLL || 0)}</td>
       <td class="p-2 text-center font-mono border-r border-slate-200 editable-cell" data-prop="codServico">${n.outroMunicipio ? (n.codServico || "-") : "-"}</td>
       <td class="p-2 text-center border-r border-slate-200 editable-cell font-bold text-slate-700 font-mono" data-prop="statusServico">
         ${n.outroMunicipio 
@@ -405,11 +519,24 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
     filtradas = filtradas.filter((n) => n.outroMunicipio === true);
   }
 
-  // Apply "À Conferir" Filter
-  const fltAConferirEl = document.getElementById("fltAConferir");
-  const fltAConferir = fltAConferirEl ? fltAConferirEl.checked : false;
-  if (fltAConferir) {
-    filtradas = filtradas.filter((n) => !n.conferida);
+  // Apply Conferência Filter
+  const fltConfEl = document.getElementById("fltConferencia");
+  const fltConf = fltConfEl ? fltConfEl.value : "todos";
+
+  if (fltConf === "a_conferir_iss") {
+    filtradas = filtradas.filter((n) => !n.conferida_iss);
+  } else if (fltConf === "a_conferir_federais") {
+    filtradas = filtradas.filter((n) => !n.conferida_federais);
+  } else if (fltConf === "totalmente_conferidas") {
+    filtradas = filtradas.filter((n) => n.conferida_iss && n.conferida_federais);
+  } else if (fltConf === "pendentes") {
+    filtradas = filtradas.filter((n) => !n.conferida_iss || !n.conferida_federais);
+  } else {
+    // Fallback if legacy checkbox fltAConferir exists and is checked
+    const fltAConferirEl = document.getElementById("fltAConferir");
+    if (fltAConferirEl && fltAConferirEl.checked) {
+      filtradas = filtradas.filter((n) => !n.conferida_iss || !n.conferida_federais);
+    }
   }
 
   // Sorting
@@ -819,6 +946,22 @@ export function alternarModoConferencia() {
       btnLote.classList.remove("hidden");
     } else {
       btnLote.classList.add("hidden");
+    }
+  }
+  const btnIss = document.getElementById("btnConferirISSLote");
+  if (btnIss) {
+    if (window.modoConferencia) {
+      btnIss.classList.remove("hidden");
+    } else {
+      btnIss.classList.add("hidden");
+    }
+  }
+  const btnFed = document.getElementById("btnConferirFederaisLote");
+  if (btnFed) {
+    if (window.modoConferencia) {
+      btnFed.classList.remove("hidden");
+    } else {
+      btnFed.classList.add("hidden");
     }
   }
   renderNotas(false);
