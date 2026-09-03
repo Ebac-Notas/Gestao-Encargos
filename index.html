@@ -161,16 +161,26 @@
           </h1>
         </div>
         <div class="flex items-center gap-4">
-          <!-- Botão Conferir Notas (exibido apenas no Modo Conferência) -->
+          <!-- Botões de Conferência Lote (exibidos apenas no Modo Conferência) -->
           <button
             type="button"
-            id="btnConferirNotasLote"
-            onclick="conferirNotasLote()"
-            class="hidden px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] uppercase rounded border border-emerald-500 transition-all focus:outline-none flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer animate-pulse"
-            title="Salvar status de conferência das notas na tabela"
+            id="btnConferirISSLote"
+            onclick="conferirNotasLote('iss')"
+            class="hidden px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] uppercase rounded border border-emerald-500 transition-all focus:outline-none flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+            title="Conferir ISS das notas selecionadas"
+          >
+            <span class="material-symbols-outlined text-[15px]">task_alt</span>
+            <span>Conferir ISS</span>
+          </button>
+          <button
+            type="button"
+            id="btnConferirFederaisLote"
+            onclick="conferirNotasLote('federais')"
+            class="hidden px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] uppercase rounded border border-teal-500 transition-all focus:outline-none flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+            title="Conferir Impostos Federais (INSS, IR, PCC) das notas selecionadas"
           >
             <span class="material-symbols-outlined text-[15px]">done_all</span>
-            <span>Conferir Notas</span>
+            <span>Conferir Impostos Federais</span>
           </button>
           <div
             class="flex items-center gap-2 mr-4 cursor-pointer full-click-picker"
@@ -409,17 +419,29 @@
                   />
                   Outros Municípios</label
                 >
-                <label
-                  class="flex items-center gap-1 cursor-pointer text-indigo-700 hover:text-indigo-900 font-extrabold border-l border-slate-200 pl-3 uppercase select-none"
-                  title="Filtrar por Notas a Conferir"
-                  ><input
-                    type="checkbox"
-                    class="flt-encargo rounded text-indigo-600 border-slate-300 focus:ring-0 focus:ring-offset-0"
-                    id="fltAConferir"
+                <div class="flex items-center gap-1.5 border-l border-slate-200 pl-3 select-none">
+                  <label
+                    for="fltConferencia"
+                    class="text-indigo-800 hover:text-indigo-900 font-extrabold uppercase text-[10px] tracking-wider cursor-pointer flex items-center gap-1"
+                    title="Filtrar notas por conferência"
+                  >
+                    <span class="material-symbols-outlined text-[13px] text-indigo-600">checklist_rtl</span>
+                    <span>Conferência:</span>
+                  </label>
+                  <select
+                    id="fltConferencia"
                     onchange="renderNotas(false)"
-                  />
-                  À Conferir</label
-                >
+                    class="bg-white border border-indigo-200 text-indigo-900 text-[11px] font-bold rounded px-1.5 py-0.5 shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-[24px]"
+                    title="Selecione o filtro de conferência"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="a_conferir_iss">À conferir ISS</option>
+                    <option value="a_conferir_federais">À conferir Federais</option>
+                    <option value="totalmente_conferidas">Totalmente conferidas</option>
+                    <option value="pendentes">Pendentes</option>
+                  </select>
+                  <input type="checkbox" id="fltAConferir" class="hidden" />
+                </div>
               </div>
 
               <!-- Borda/Parentesco Direita (Clicável para fechar ao expandir) -->
