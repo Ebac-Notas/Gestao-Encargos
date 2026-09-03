@@ -100,15 +100,30 @@ export function validarCNPJ(cnpj) {
   return true;
 }
 
-export async function atualizarStatusConferida(idNota, status) {
+export async function atualizarStatusConferida(idNota, status, tipo = null, tipoStatus = null) {
   if (!supabase) return false;
   try {
+    let payload = { conferida: !!status };
+    if (tipo && (tipo === "iss" || tipo === "federais")) {
+      payload[`conferida_${tipo}`] = !!tipoStatus;
+    }
+
     const { data, error } = await supabase
       .from("notas_fiscais")
-      .update({ conferida: !!status })
+      .update(payload)
       .eq("id", idNota);
 
     if (error) {
+      // Fallback if specific column does not exist in schema
+      if (payload[`conferida_${tipo}`] !== undefined) {
+        const fallback = await supabase
+          .from("notas_fiscais")
+          .update({ conferida: !!status })
+          .eq("id", idNota);
+        if (!fallback.error) {
+          return true;
+        }
+      }
       console.error("Erro ao atualizar status de conferência no Supabase:", error);
       return false;
     }
@@ -320,6 +335,33 @@ export function aplicarValoresSugeridos(valores) {
   recalcularValorLiquido();
 }
 
+export function setLockTaxFields(lock) {
+  const taxElNames = ["iptISS", "iptINSS", "iptIR", "iptPIS", "iptCOFINS", "iptCSLL", "iptPisVal"];
+  taxElNames.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (lock) {
+        el.disabled = true;
+        el.classList.add("opacity-60", "bg-slate-50", "cursor-wait");
+      } else {
+        el.disabled = false;
+        el.classList.remove("opacity-60", "bg-slate-50", "cursor-wait");
+      }
+    }
+  });
+
+  if (!lock && window.deveFocarNoIssAposCarregamento) {
+    window.deveFocarNoIssAposCarregamento = false;
+    setTimeout(() => {
+      const elIss = document.getElementById("iptISS");
+      if (elIss) {
+        elIss.focus();
+        elIss.select();
+      }
+    }, 50);
+  }
+}
+
 export async function predizerEncargos() {
   if (!supabase) return;
 
@@ -335,8 +377,12 @@ export async function predizerEncargos() {
 
   // O gatilho de busca deve ocorrer de forma assíncrona assim que o usuário preencher o CNPJ e o Valor Bruto da nota atual.
   if (!rawCnpj || rawCnpj.length < 14 || valorBruto <= 0 || !codCond) {
+    setLockTaxFields(false);
     return;
   }
+
+  // Lock input fields during database fetch to prevent user input conflicts
+  setLockTaxFields(true);
 
   try {
     // REGRA 1 (Mesmo Condomínio, Mesmo Valor Bruto)
@@ -448,12 +494,31 @@ export async function predizerEncargos() {
 
   } catch (error) {
     console.error("Erro ao predizer encargos:", error);
+  } finally {
+    setLockTaxFields(false);
   }
 }
 
 let predizerDebounceTimeout = null;
 export function debouncedPredizerEncargos() {
   clearTimeout(predizerDebounceTimeout);
+
+  const iptCnpj = document.getElementById("iptCnpj");
+  const iptValorBruto = document.getElementById("iptValorBruto");
+  const iptCondominio = document.getElementById("iptCondominio");
+
+  if (iptCnpj && iptValorBruto && iptCondominio) {
+    const rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "");
+    const valorBruto = parseFloat(iptValorBruto.value) || 0;
+    const codCond = iptCondominio.value.trim();
+
+    if (rawCnpj && rawCnpj.length >= 14 && valorBruto > 0 && codCond && codCond.length === 3) {
+      setLockTaxFields(true);
+    } else {
+      setLockTaxFields(false);
+    }
+  }
+
   predizerDebounceTimeout = setTimeout(() => {
     predizerEncargos();
   }, 400);
