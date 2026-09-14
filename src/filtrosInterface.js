@@ -69,20 +69,50 @@ export function saveConferenceStateMap(map) {
   } catch (e) {}
 }
 
+export function temISS(nota) {
+  if (!nota) return false;
+  return Number(nota.iss || 0) > 0;
+}
+
+export function temFederais(nota) {
+  if (!nota) return false;
+  const inss = Number(nota.inss || 0);
+  const ir = Number(nota.ir || 0);
+  const pisDigitado = Number(nota.pisDigitado !== undefined ? nota.pisDigitado : (nota.pis_digitado || 0));
+  const valPIS = Number(nota.valPIS !== undefined ? nota.valPIS : (nota.val_pis || 0));
+  const valCOFINS = Number(nota.valCOFINS !== undefined ? nota.valCOFINS : (nota.val_cofins || 0));
+  const valCSLL = Number(nota.valCSLL !== undefined ? nota.valCSLL : (nota.val_csll || 0));
+  return inss > 0 || ir > 0 || pisDigitado > 0 || valPIS > 0 || valCOFINS > 0 || valCSLL > 0;
+}
+window.temISS = temISS;
+window.temFederais = temFederais;
+
 export function setNoteConferenceStatus(idNota, tipo, status) {
   const map = getConferenceStateMap();
   const idKey = String(idNota);
+  const n = (window.dbNotas || []).find((x) => String(x.id) === idKey) ||
+            (window.notasDoMes || []).find((x) => String(x.id) === idKey);
+
   if (!map[idKey]) {
-    const n = (window.dbNotas || []).find((x) => String(x.id) === idKey);
     map[idKey] = {
       iss: n ? !!n.conferida_iss : false,
       federais: n ? !!n.conferida_federais : false,
     };
   }
+
+  const hasIss = n ? temISS(n) : true;
+  const hasFed = n ? temFederais(n) : true;
+
   if (tipo === "iss") {
     map[idKey].iss = !!status;
+    if (!hasFed) {
+      map[idKey].federais = !!status;
+    }
   } else if (tipo === "federais") {
     map[idKey].federais = !!status;
+    if (!hasIss) {
+      map[idKey].iss = !!status;
+    }
   }
   saveConferenceStateMap(map);
   return map[idKey];
@@ -212,11 +242,25 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
         const confMap = getConferenceStateMap();
         window.dbNotas = data.map((n) => {
           const idKey = String(n.id);
+          const hasIss = temISS(n);
+          const hasFed = temFederais(n);
+
           let isIssConferida = false;
           let isFederaisConferida = false;
 
           if (n.conferida && (!n.conferida_iss && !n.conferida_federais)) {
             // Nota conferida pelo sistema anterior antes da divisão dos tributos
+            isIssConferida = true;
+            isFederaisConferida = true;
+          } else if (n.conferida) {
+            isIssConferida = true;
+            isFederaisConferida = true;
+          } else if (hasIss && !hasFed && (n.conferida_iss || (confMap[idKey] && confMap[idKey].iss))) {
+            // Linha com APENAS ISS ao ter sua conferência realizada -> conferência total
+            isIssConferida = true;
+            isFederaisConferida = true;
+          } else if (!hasIss && hasFed && (n.conferida_federais || (confMap[idKey] && confMap[idKey].federais))) {
+            // Linha com APENAS Federais ao ter sua conferência realizada -> conferência total
             isIssConferida = true;
             isFederaisConferida = true;
           } else {
@@ -303,9 +347,21 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
             window.dbNotas.forEach((nota) => {
               const idKey = String(nota.id);
               if (confMap[idKey]) {
-                nota.conferida_iss = !!confMap[idKey].iss;
-                nota.conferida_federais = !!confMap[idKey].federais;
-                nota.conferida = !!(nota.conferida_iss && nota.conferida_federais);
+                const hasIss = temISS(nota);
+                const hasFed = temFederais(nota);
+                if (hasIss && !hasFed && confMap[idKey].iss) {
+                  nota.conferida_iss = true;
+                  nota.conferida_federais = true;
+                  nota.conferida = true;
+                } else if (!hasIss && hasFed && confMap[idKey].federais) {
+                  nota.conferida_iss = true;
+                  nota.conferida_federais = true;
+                  nota.conferida = true;
+                } else {
+                  nota.conferida_iss = !!confMap[idKey].iss;
+                  nota.conferida_federais = !!confMap[idKey].federais;
+                  nota.conferida = !!(nota.conferida_iss && nota.conferida_federais);
+                }
               }
             });
           }
@@ -313,9 +369,21 @@ export async function sincronizarDados(entidade = "todas", condominioCodigo = nu
             window.notasDoMes.forEach((nota) => {
               const idKey = String(nota.id);
               if (confMap[idKey]) {
-                nota.conferida_iss = !!confMap[idKey].iss;
-                nota.conferida_federais = !!confMap[idKey].federais;
-                nota.conferida = !!(nota.conferida_iss && nota.conferida_federais);
+                const hasIss = temISS(nota);
+                const hasFed = temFederais(nota);
+                if (hasIss && !hasFed && confMap[idKey].iss) {
+                  nota.conferida_iss = true;
+                  nota.conferida_federais = true;
+                  nota.conferida = true;
+                } else if (!hasIss && hasFed && confMap[idKey].federais) {
+                  nota.conferida_iss = true;
+                  nota.conferida_federais = true;
+                  nota.conferida = true;
+                } else {
+                  nota.conferida_iss = !!confMap[idKey].iss;
+                  nota.conferida_federais = !!confMap[idKey].federais;
+                  nota.conferida = !!(nota.conferida_iss && nota.conferida_federais);
+                }
               }
             });
           }
@@ -530,18 +598,18 @@ export async function renderNotas(fetchFirst = true, condominioCodigo = null) {
   const fltConf = fltConfEl ? fltConfEl.value : "todos";
 
   if (fltConf === "a_conferir_iss") {
-    filtradas = filtradas.filter((n) => !n.conferida_iss);
+    filtradas = filtradas.filter((n) => !n.conferida_iss && temISS(n));
   } else if (fltConf === "a_conferir_federais") {
-    filtradas = filtradas.filter((n) => !n.conferida_federais);
+    filtradas = filtradas.filter((n) => !n.conferida_federais && temFederais(n));
   } else if (fltConf === "totalmente_conferidas") {
-    filtradas = filtradas.filter((n) => n.conferida_iss && n.conferida_federais);
+    filtradas = filtradas.filter((n) => n.conferida || (n.conferida_iss && n.conferida_federais));
   } else if (fltConf === "pendentes") {
-    filtradas = filtradas.filter((n) => !n.conferida_iss || !n.conferida_federais);
+    filtradas = filtradas.filter((n) => !n.conferida && (!n.conferida_iss || !n.conferida_federais));
   } else {
     // Fallback if legacy checkbox fltAConferir exists and is checked
     const fltAConferirEl = document.getElementById("fltAConferir");
     if (fltAConferirEl && fltAConferirEl.checked) {
-      filtradas = filtradas.filter((n) => !n.conferida_iss || !n.conferida_federais);
+      filtradas = filtradas.filter((n) => !n.conferida && (!n.conferida_iss || !n.conferida_federais));
     }
   }
 
