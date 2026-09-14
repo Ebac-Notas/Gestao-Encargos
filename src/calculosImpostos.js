@@ -100,12 +100,17 @@ export function validarCNPJ(cnpj) {
   return true;
 }
 
-export async function atualizarStatusConferida(idNota, status, tipo = null, tipoStatus = null) {
+export async function atualizarStatusConferida(idNota, statusOrPayload, tipo = null, tipoStatus = null) {
   if (!supabase) return false;
   try {
-    let payload = { conferida: !!status };
-    if (tipo && (tipo === "iss" || tipo === "federais")) {
-      payload[`conferida_${tipo}`] = !!tipoStatus;
+    let payload = {};
+    if (typeof statusOrPayload === "object" && statusOrPayload !== null) {
+      payload = { ...statusOrPayload };
+    } else {
+      payload = { conferida: !!statusOrPayload };
+      if (tipo && (tipo === "iss" || tipo === "federais")) {
+        payload[`conferida_${tipo}`] = !!tipoStatus;
+      }
     }
 
     const { data, error } = await supabase
@@ -115,10 +120,10 @@ export async function atualizarStatusConferida(idNota, status, tipo = null, tipo
 
     if (error) {
       // Fallback if specific column does not exist in schema
-      if (payload[`conferida_${tipo}`] !== undefined) {
+      if (payload.conferida_iss !== undefined || payload.conferida_federais !== undefined) {
         const fallback = await supabase
           .from("notas_fiscais")
-          .update({ conferida: !!status })
+          .update({ conferida: !!payload.conferida })
           .eq("id", idNota);
         if (!fallback.error) {
           return true;
