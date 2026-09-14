@@ -30,7 +30,9 @@ import {
   parseLogDate,
   getNumNotaFromLog,
   alterarQtdeExibicao,
-  setNoteConferenceStatus
+  setNoteConferenceStatus,
+  temISS,
+  temFederais
 } from "./filtrosInterface.js";
 
 // --- GLOBAL STATE INITIALIZATION ---
@@ -3773,30 +3775,51 @@ export async function conferirNotasLote(tipo = "iss") {
     // Update in-memory objects
     const notaDb = dbNotasArray.find(n => String(n.id) === String(idNota));
     const notaMem = notasDoMesArray.find(n => String(n.id) === String(idNota));
+    const notaRef = notaDb || notaMem;
+
+    const hasIss = notaRef ? temISS(notaRef) : true;
+    const hasFed = notaRef ? temFederais(notaRef) : true;
+
+    let confIss = false;
+    let confFed = false;
+
+    if (tipo === "iss") {
+      if (!hasFed) {
+        // Linha contém apenas ISS (sem tributos federais): conferir ISS marca conferência total!
+        confIss = newStatus;
+        confFed = newStatus;
+      } else {
+        confIss = newStatus;
+        confFed = notaRef ? !!notaRef.conferida_federais : false;
+      }
+    } else {
+      // tipo === "federais"
+      if (!hasIss) {
+        // Linha contém apenas impostos federais (sem ISS): conferir Federais marca conferência total!
+        confFed = newStatus;
+        confIss = newStatus;
+      } else {
+        confFed = newStatus;
+        confIss = notaRef ? !!notaRef.conferida_iss : false;
+      }
+    }
+
+    const confTotal = confIss && confFed;
 
     if (notaDb) {
-      if (tipo === "iss") {
-        notaDb.conferida_iss = newStatus;
-      } else {
-        notaDb.conferida_federais = newStatus;
-      }
-      notaDb.conferida = !!(notaDb.conferida_iss && notaDb.conferida_federais);
+      notaDb.conferida_iss = confIss;
+      notaDb.conferida_federais = confFed;
+      notaDb.conferida = confTotal;
     }
     if (notaMem) {
-      if (tipo === "iss") {
-        notaMem.conferida_iss = newStatus;
-      } else {
-        notaMem.conferida_federais = newStatus;
-      }
-      notaMem.conferida = !!(notaMem.conferida_iss && notaMem.conferida_federais);
+      notaMem.conferida_iss = confIss;
+      notaMem.conferida_federais = confFed;
+      notaMem.conferida = confTotal;
     }
 
-    const confIss = notaDb ? !!notaDb.conferida_iss : false;
-    const confFed = notaDb ? !!notaDb.conferida_federais : false;
-    const confTotal = confIss && confFed;
-    const numNota = notaDb ? notaDb.numNota : "";
-    const cnpj = notaDb ? notaDb.cnpj : "";
-    const ref = notaDb ? notaDb.referencia : "";
+    const numNota = notaRef ? notaRef.numNota : "";
+    const cnpj = notaRef ? notaRef.cnpj : "";
+    const ref = notaRef ? notaRef.referencia : "";
 
     // Immediate visual styling feedback
     const tr = cb.closest("tr");
@@ -3815,7 +3838,7 @@ export async function conferirNotasLote(tipo = "iss") {
         if (confIss && !confTotal) {
           tdIss.style.backgroundColor = "#bbf7d0";
           tdIss.title = "ISS Conferido";
-        } else if (!confTotal) {
+        } else {
           tdIss.style.backgroundColor = "";
           tdIss.removeAttribute("title");
         }
@@ -3827,21 +3850,40 @@ export async function conferirNotasLote(tipo = "iss") {
         if (confFed && !confTotal) {
           cell.style.backgroundColor = "#bbf7d0";
           cell.title = "Impostos Federais Conferidos";
-        } else if (!confTotal) {
+        } else {
           cell.style.backgroundColor = "";
           cell.removeAttribute("title");
         }
       });
     }
 
-    // Call Supabase update operation
+    // Call Supabase update operation with exact state for all 3 columns
     promessas.push(
-      atualizarStatusConferida(idNota, confTotal, tipo, newStatus).then((success) => {
+      atualizarStatusConferida(idNota, {
+        conferida: confTotal,
+        conferida_iss: confIss,
+        conferida_federais: confFed
+      }).then((success) => {
         if (!success) {
           console.error(`Falha ao registrar status de conferência para nota ID ${idNota}`);
         }
       })
     );
+
+    let logDesc = "";
+    if (tipo === "iss") {
+      if (!hasFed) {
+        logDesc = `Conferência Total de ISS (linha sem federais) definida como [${newStatus ? "CONFERIDO" : "PENDENTE"}] na NF [${numNota}] - CNPJ ${cnpj}`;
+      } else {
+        logDesc = `Conferência de ISS definida como [${newStatus ? "CONFERIDO" : "PENDENTE"}] na NF [${numNota}] - CNPJ ${cnpj}`;
+      }
+    } else {
+      if (!hasIss) {
+        logDesc = `Conferência Total de Impostos Federais (linha sem ISS) definida como [${newStatus ? "CONFERIDO" : "PENDENTE"}] na NF [${numNota}] - CNPJ ${cnpj}`;
+      } else {
+        logDesc = `Conferência de Impostos Federais definida como [${newStatus ? "CONFERIDO" : "PENDENTE"}] na NF [${numNota}] - CNPJ ${cnpj}`;
+      }
+    }
 
     logsParaInserir.push({
       operador: oper,
@@ -3850,7 +3892,7 @@ export async function conferirNotasLote(tipo = "iss") {
         : (newStatus ? "CONFERIR_FEDERAIS" : "DESCONFERIR_FEDERAIS"),
       entidade: `Nota #${numNota}`,
       recurso: `ID_${idNota}`,
-      descricao: `Conferência de ${nomeTipo} definida como [${newStatus ? "CONFERIDO" : "PENDENTE"}] na NF [${numNota}] - CNPJ ${cnpj}`,
+      descricao: logDesc,
       referencia: ref || ""
     });
   });
