@@ -867,6 +867,45 @@ export function getNumNotaFromLog(a) {
   return "-";
 }
 
+export function formatarNomeAcao(acao) {
+  if (!acao) return { label: "Operação", classe: "bg-slate-200 text-slate-800 border-slate-300" };
+  const a = String(acao).trim();
+
+  // Inclusões
+  if (a === "CREATE_INVOICE" || a === "ADD_NOTA") {
+    return { label: "Inclusão", classe: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+  }
+  if (a === "ADD_EMPRESA") {
+    return { label: "Inclusão", classe: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+  }
+  if (a === "ADD_CONDOMINIO") {
+    return { label: "Inclusão", classe: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+  }
+  if (a === "BATCH_EMPRESA" || a === "BATCH_CONDOMINIO") {
+    return { label: "Inclusão em Lote", classe: "bg-teal-100 text-teal-800 border-teal-300" };
+  }
+
+  // Alterações
+  if (a.startsWith("UPDATE_") || a === "EDITAR_NOTA") {
+    return { label: "Alteração", classe: "bg-indigo-100 text-indigo-800 border-indigo-300" };
+  }
+
+  // Exclusões
+  if (a.startsWith("DELETE_") || a === "EXCLUSAO" || a === "EXCLUIR_NOTA") {
+    return { label: "Exclusão", classe: "bg-red-100 text-red-800 border-red-300" };
+  }
+
+  // Conferências
+  if (a === "CONFERIR_ISS" || a === "CONFERIR_FEDERAIS" || a === "CONFERENCIA_TOTAL") {
+    return { label: "Conferência", classe: "bg-blue-100 text-blue-800 border-blue-300" };
+  }
+  if (a === "DESCONFERIR_ISS" || a === "DESCONFERIR_FEDERAIS") {
+    return { label: "Desconferência", classe: "bg-amber-100 text-amber-800 border-amber-300" };
+  }
+
+  return { label: a, classe: "bg-slate-200 text-slate-800 border-slate-300" };
+}
+
 export async function renderAuditoria(fetchFirst = true) {
   if (fetchFirst) {
     await sincronizarDados("auditoria");
@@ -907,10 +946,26 @@ export async function renderAuditoria(fetchFirst = true) {
   // 1. Filter by Action type
   const actionFilterEl = document.getElementById("fltLogAcao");
   const actionFilter = actionFilterEl ? actionFilterEl.value : "ALL";
-  if (actionFilter === "CREATE_ONLY") {
-    filtrados = filtrados.filter((a) => a.acao === "CREATE_INVOICE");
-  } else if (actionFilter === "UPDATE_ONLY") {
-    filtrados = filtrados.filter((a) => a.acao !== "CREATE_INVOICE");
+  if (actionFilter === "INCLUSAO" || actionFilter === "CREATE_ONLY") {
+    filtrados = filtrados.filter((a) => {
+      const ac = String(a.acao || "");
+      return ac === "CREATE_INVOICE" || ac === "ADD_NOTA" || ac === "ADD_EMPRESA" || ac === "ADD_CONDOMINIO" || ac === "BATCH_EMPRESA" || ac === "BATCH_CONDOMINIO";
+    });
+  } else if (actionFilter === "ALTERACAO" || actionFilter === "UPDATE_ONLY") {
+    filtrados = filtrados.filter((a) => {
+      const ac = String(a.acao || "");
+      return ac.startsWith("UPDATE_") || ac === "EDITAR_NOTA";
+    });
+  } else if (actionFilter === "EXCLUSAO") {
+    filtrados = filtrados.filter((a) => {
+      const ac = String(a.acao || "");
+      return ac.startsWith("DELETE_") || ac === "EXCLUSAO" || ac === "EXCLUIR_NOTA";
+    });
+  } else if (actionFilter === "CONFERENCIA") {
+    filtrados = filtrados.filter((a) => {
+      const ac = String(a.acao || "");
+      return ac.includes("CONFERIR") || ac.includes("CONFERENCIA");
+    });
   }
 
   // 2. Filter by Period (mensal, anual, custom)
@@ -968,22 +1023,71 @@ export async function renderAuditoria(fetchFirst = true) {
     return order === "asc" ? t1 - t2 : t2 - t1;
   });
 
+  // Store active filtered auditoria for pagination
+  window.auditoriaFiltradaAtiva = [...filtrados];
+  const totalAuditoriaOriginal = filtrados.length;
+  const itemsPerPage = 50;
+  const paginasTotais = Math.ceil(totalAuditoriaOriginal / itemsPerPage) || 1;
+
+  if (window.paginaAtualAuditoria > paginasTotais) {
+    window.paginaAtualAuditoria = paginasTotais;
+  }
+  if (window.paginaAtualAuditoria < 1) {
+    window.paginaAtualAuditoria = 1;
+  }
+
+  const startIdx = (window.paginaAtualAuditoria - 1) * itemsPerPage;
+  const endIdx = Math.min(startIdx + itemsPerPage, totalAuditoriaOriginal);
+
+  filtrados = filtrados.slice(startIdx, endIdx);
+
+  // Update Auditoria Pagination controls
+  const paginacaoDiv = document.getElementById("paginacaoAuditoria");
+  if (paginacaoDiv) {
+    if (paginasTotais > 1) {
+      paginacaoDiv.classList.remove("hidden");
+    } else {
+      paginacaoDiv.classList.add("hidden");
+    }
+
+    const pagSurgindoInfo = document.getElementById("pagSurgindoAuditoriaInfo");
+    const pagTotalInfo = document.getElementById("pagTotalAuditoriaInfo");
+    const pagAtualText = document.getElementById("pagAtualAuditoria");
+    const pagTotalText = document.getElementById("pagTotalAuditoria");
+    const btnPrev = document.getElementById("btnPagAnteriorAuditoria");
+    const btnNext = document.getElementById("btnPagProximaAuditoria");
+
+    if (pagSurgindoInfo) {
+      pagSurgindoInfo.innerText = totalAuditoriaOriginal > 0 ? `${startIdx + 1} - ${endIdx}` : "0 - 0";
+    }
+    if (pagTotalInfo) {
+      pagTotalInfo.innerText = totalAuditoriaOriginal;
+    }
+    if (pagAtualText) {
+      pagAtualText.innerText = window.paginaAtualAuditoria;
+    }
+    if (pagTotalText) {
+      pagTotalText.innerText = paginasTotais;
+    }
+    if (btnPrev) {
+      btnPrev.disabled = window.paginaAtualAuditoria <= 1;
+    }
+    if (btnNext) {
+      btnNext.disabled = window.paginaAtualAuditoria >= paginasTotais;
+    }
+  }
+
   // 4. Render Table Row Markup
   filtrados.forEach((a) => {
     const numNotaDisplay = getNumNotaFromLog(a);
-    let statusClass = "bg-slate-200 text-slate-800 border-slate-300";
-    if (a.acao === "CREATE_INVOICE") {
-      statusClass = "bg-emerald-100 text-emerald-800 border-emerald-300";
-    } else if (a.acao.startsWith("UPDATE_")) {
-      statusClass = "bg-indigo-100 text-indigo-800 border-indigo-300";
-    }
+    const { label: acaoLabel, classe: statusClass } = formatarNomeAcao(a.acao);
 
     grid.innerHTML += `
        <tr class="hover:bg-yellow-50 cursor-crosshair transition-colors border-b border-slate-200">
          <td class="p-2.5 border-r border-slate-200 font-bold text-slate-800">${a.dataHora}</td>
          <td class="p-2.5 border-r border-slate-200 font-bold text-blue-700 text-center">${a.operador}</td>
          <td class="p-2.5 border-r border-slate-200 text-center">
-            <span class="${statusClass} border px-2 py-0.5 rounded font-black tracking-tight text-[10px] block">${a.acao}</span>
+            <span class="${statusClass} border px-2 py-0.5 rounded font-black tracking-tight text-[10px] block" title="${a.acao}">${acaoLabel}</span>
          </td>
          <td class="p-2.5 border-r border-slate-200 font-mono font-bold text-[11px] text-center text-slate-800 bg-slate-50">${numNotaDisplay}</td>
          <td class="p-2.5 border-r border-slate-200 text-center font-bold">${a.entidade}</td>
@@ -993,6 +1097,19 @@ export async function renderAuditoria(fetchFirst = true) {
      `;
   });
 }
+
+export function mudarPaginaAuditoria(direcao) {
+  const totItens = window.auditoriaFiltradaAtiva ? window.auditoriaFiltradaAtiva.length : 0;
+  const itemsPerPage = 50;
+  const totPaginas = Math.ceil(totItens / itemsPerPage) || 1;
+  const novaPagina = (window.paginaAtualAuditoria || 1) + direcao;
+
+  if (novaPagina >= 1 && novaPagina <= totPaginas) {
+    window.paginaAtualAuditoria = novaPagina;
+    renderAuditoria(false);
+  }
+}
+window.mudarPaginaAuditoria = mudarPaginaAuditoria;
 
 export function alternarModoConferencia() {
   window.modoConferencia = !window.modoConferencia;
