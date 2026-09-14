@@ -50,6 +50,8 @@ window.cnpjPendingTimeout = null;
 window.tempUf = null;
 window.ultimoCnpjProcessado = "";
 window.paginaAtualNotas = 1;
+window.paginaAtualAuditoria = 1;
+window.auditoriaFiltradaAtiva = [];
 window.qtdeExibicaoNotas = localStorage.getItem("qtdeExibicaoNotas") || "20";
 window.itensPorPaginaNotas = window.qtdeExibicaoNotas === "50" ? 50 : (window.qtdeExibicaoNotas === "todos" ? 999999 : 20);
 window.notasFiltradasAtivas = [];
@@ -1171,7 +1173,7 @@ export function logarUsuario(nome) {
   renderEmpresas(true);
   renderCondominios(true);
 
-  alterarAba("tab-notas");
+  alterarAba("tab-lancar");
   inicializarRealtime();
 }
 window.logarUsuario = logarUsuario;
@@ -2283,19 +2285,24 @@ export function handleAcaoRow(gridName, id, btnObj) {
               await supabase.from("notas_fiscais").delete().eq("id", row.id);
 
               let oper = getOperador();
+              const nomeEmp = row.nomeEmp || "Não informada";
+              const issStr = row.iss > 0 ? `ISS: ${formatMoney(row.iss)}` : "Sem ISS";
+              const fedStr = (row.inss > 0 || row.ir > 0 || row.pisDigitado > 0) ? `Federais: ${formatMoney((row.inss||0) + (row.ir||0) + (row.pisDigitado||0))}` : "Sem Federais";
               await supabase.from("logs_auditoria").insert([
                 {
                   operador: oper,
                   acao: "DELETE_INVOICE",
                   entidade: row.codCond,
                   recurso: cleanCnpj,
-                  descricao: `Exclusão de NF [${cleanNota}] no valor de ${formatMoney(row.valor)}`,
+                  descricao: `Exclusão de NF [${cleanNota}] - Condomínio: ${row.codCond} - Fornecedor: ${nomeEmp} (CNPJ: ${cleanCnpj}) - Bruto: ${formatMoney(row.valor)} (${issStr}, ${fedStr})`,
                   referencia: row.referencia,
                   num_nota: cleanNota,
                 },
               ]);
             }
           } else if (gridName === "empresas") {
+            const empObj = window.dbEmpresas.find((e) => e.cnpj === id);
+            const nomeEmp = empObj ? empObj.nome : "";
             await supabase.from("empresas").delete().eq("cnpj", id);
 
             let oper = getOperador();
@@ -2304,12 +2311,15 @@ export function handleAcaoRow(gridName, id, btnObj) {
                 operador: oper,
                 acao: "DELETE_EMPRESA",
                 entidade: id,
-                recurso: "",
-                descricao: `Exclusão manual de cadastro de Empresa fornecedora`,
+                recurso: nomeEmp,
+                descricao: `Exclusão manual de cadastro da Empresa: ${nomeEmp} (CNPJ: ${id})`,
                 referencia: getEl("txtReferencia").value,
               },
             ]);
           } else if (gridName === "cond") {
+            const condObj = window.dbCondominios.find((c) => c.codigo === id);
+            const nomeCond = condObj ? condObj.nome : "";
+            const cnpjCond = condObj ? condObj.cnpj || "" : "";
             await supabase.from("condominios").delete().eq("codigo", id);
 
             let oper = getOperador();
@@ -2318,8 +2328,8 @@ export function handleAcaoRow(gridName, id, btnObj) {
                 operador: oper,
                 acao: "DELETE_CONDOMINIO",
                 entidade: id,
-                recurso: "",
-                descricao: `Exclusão manual de condomínio administrador`,
+                recurso: nomeCond,
+                descricao: `Exclusão manual do condomínio: [${id}] ${nomeCond}${cnpjCond ? ` (CNPJ: ${cnpjCond})` : ""}`,
                 referencia: getEl("txtReferencia").value,
               },
             ]);
