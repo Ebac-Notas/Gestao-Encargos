@@ -5,6 +5,7 @@
 }
 
 #tela-dashboard {
+  height: calc(100% / var(--app-font-scale, 1));
   zoom: var(--app-font-scale, 1);
   transform-origin: top center;
   transition: zoom 0.15s ease-out;
