@@ -253,26 +253,18 @@ export function aplicarValoresSugeridos(valores) {
   const elCofins = document.getElementById("iptCOFINS");
   const elCsll = document.getElementById("iptCSLL");
 
-  // Função auxiliar para verificar se o campo já tem um valor preenchido de forma válida
-  // (ex: com vírgula/ponto e duas casas decimais, ou simplesmente se o valor foi preenchido pelo usuário).
+  // Função auxiliar para verificar se o campo já tem um valor preenchido ou está com foco ativo
   const deveProteger = (el) => {
     if (!el) return false;
+    // Se o usuário está com o foco ativo no campo (digitando ou acabou de entrar nele), protege imediatamente
+    if (document.activeElement === el) {
+      return true;
+    }
     const val = el.value.trim();
-    if (!val) return false;
-    
-    // Verifica se possui formato de duas casas decimais (ponto ou vírgula)
-    const regexDuasCasas = /\d+[\.,]\d{2}$/;
-    if (regexDuasCasas.test(val)) {
+    // Qualquer preenchimento feito pelo usuário deve ser protegido contra sobrescrita
+    if (val.length > 0) {
       return true;
     }
-    
-    // Como segurança para campos do tipo number onde o browser pode ocultar as casas decimais de números redondos (ex: "100"),
-    // se o campo possui um valor numérico válido e maior que zero, ele é considerado protegido para não ser sobrescrito pelos smart defaults.
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0) {
-      return true;
-    }
-    
     return false;
   };
 
@@ -341,30 +333,8 @@ export function aplicarValoresSugeridos(valores) {
 }
 
 export function setLockTaxFields(lock) {
-  const taxElNames = ["iptISS", "iptINSS", "iptIR", "iptPIS", "iptCOFINS", "iptCSLL", "iptPisVal"];
-  taxElNames.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      if (lock) {
-        el.disabled = true;
-        el.classList.add("opacity-60", "bg-slate-50", "cursor-wait");
-      } else {
-        el.disabled = false;
-        el.classList.remove("opacity-60", "bg-slate-50", "cursor-wait");
-      }
-    }
-  });
-
-  if (!lock && window.deveFocarNoIssAposCarregamento) {
-    window.deveFocarNoIssAposCarregamento = false;
-    setTimeout(() => {
-      const elIss = document.getElementById("iptISS");
-      if (elIss) {
-        elIss.focus();
-        elIss.select();
-      }
-    }, 50);
-  }
+  // Mantém os campos sempre destravados e editáveis para permitir digitação imediata
+  window.deveFocarNoIssAposCarregamento = false;
 }
 
 export async function predizerEncargos() {
@@ -382,12 +352,8 @@ export async function predizerEncargos() {
 
   // O gatilho de busca deve ocorrer de forma assíncrona assim que o usuário preencher o CNPJ e o Valor Bruto da nota atual.
   if (!rawCnpj || rawCnpj.length < 14 || valorBruto <= 0 || !codCond) {
-    setLockTaxFields(false);
     return;
   }
-
-  // Lock input fields during database fetch to prevent user input conflicts
-  setLockTaxFields(true);
 
   try {
     // REGRA 1 (Mesmo Condomínio, Mesmo Valor Bruto)
@@ -508,25 +474,9 @@ let predizerDebounceTimeout = null;
 export function debouncedPredizerEncargos() {
   clearTimeout(predizerDebounceTimeout);
 
-  const iptCnpj = document.getElementById("iptCnpj");
-  const iptValorBruto = document.getElementById("iptValorBruto");
-  const iptCondominio = document.getElementById("iptCondominio");
-
-  if (iptCnpj && iptValorBruto && iptCondominio) {
-    const rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "");
-    const valorBruto = parseFloat(iptValorBruto.value) || 0;
-    const codCond = iptCondominio.value.trim();
-
-    if (rawCnpj && rawCnpj.length >= 14 && valorBruto > 0 && codCond && codCond.length === 3) {
-      setLockTaxFields(true);
-    } else {
-      setLockTaxFields(false);
-    }
-  }
-
   predizerDebounceTimeout = setTimeout(() => {
     predizerEncargos();
-  }, 400);
+  }, 300);
 }
 
 export async function carregarSmartDefaults(cnpjRaw) {
