@@ -234,10 +234,11 @@ export function aplicarTamanhoFonte(escala) {
   // Apply scale as a CSS variable on the html root
   document.documentElement.style.setProperty("--app-font-scale", safeEscala / 100);
 
-  // Directly apply inline zoom property to #tela-dashboard
+  // Directly apply inline zoom and height property to #tela-dashboard
   const dashboard = getEl("tela-dashboard");
   if (dashboard) {
     dashboard.style.zoom = safeEscala / 100;
+    dashboard.style.height = `calc(100% / ${safeEscala / 100})`;
   }
 
   // Update UI Select Preset
@@ -3639,17 +3640,6 @@ window.addEventListener("DOMContentLoaded", () => {
   if (iptValorBruto) {
     iptValorBruto.addEventListener("input", function () {
       debouncedPredizerEncargos();
-    });
-    iptValorBruto.addEventListener("keydown", function (e) {
-      if ((e.key === "Tab" || e.key === "Enter") && !e.shiftKey) {
-        const iptISS = getEl("iptISS");
-        if (iptISS && iptISS.disabled) {
-          e.preventDefault();
-          e.stopPropagation();
-          window.deveFocarNoIssAposCarregamento = true;
-          this.blur();
-        }
-      }
     });
   }
 
