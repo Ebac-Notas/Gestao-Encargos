@@ -253,32 +253,64 @@ export function aplicarValoresSugeridos(valores) {
   const elCofins = document.getElementById("iptCOFINS");
   const elCsll = document.getElementById("iptCSLL");
 
-  // Função auxiliar para verificar se o campo já tem um valor preenchido ou está com foco ativo
+  // Função auxiliar para verificar se o campo já tem um valor digitado manualmente pelo usuário
   const deveProteger = (el) => {
     if (!el) return false;
-    // Se o usuário está com o foco ativo no campo (digitando ou acabou de entrar nele), protege imediatamente
-    if (document.activeElement === el) {
+    // Se o usuário digitou manualmente um valor no campo, protege contra sobrescrita
+    if (el.dataset.userEdited === "true") {
       return true;
     }
     const val = el.value.trim();
-    // Qualquer preenchimento feito pelo usuário deve ser protegido contra sobrescrita
-    if (val.length > 0) {
+    // Se o campo já possui valor e não é uma sugestão automática anterior, protege
+    if (val.length > 0 && el.dataset.isSuggested !== "true") {
       return true;
     }
     return false;
   };
 
   if (elIss && !deveProteger(elIss)) {
-    elIss.value = valores.iss > 0 ? valores.iss.toFixed(2) : "";
-    if (valores.iss > 0) elIss.dataset.lastSeparator = ",";
+    if (valores.iss > 0) {
+      elIss.value = valores.iss.toFixed(2);
+      elIss.dataset.lastSeparator = ",";
+      elIss.dataset.isSuggested = "true";
+      delete elIss.dataset.userEdited;
+      if (document.activeElement === elIss) {
+        elIss.select();
+      }
+    } else if (elIss.dataset.isSuggested === "true") {
+      elIss.value = "";
+      delete elIss.dataset.isSuggested;
+    }
   }
+
   if (elInss && !deveProteger(elInss)) {
-    elInss.value = valores.inss > 0 ? valores.inss.toFixed(2) : "";
-    if (valores.inss > 0) elInss.dataset.lastSeparator = ",";
+    if (valores.inss > 0) {
+      elInss.value = valores.inss.toFixed(2);
+      elInss.dataset.lastSeparator = ",";
+      elInss.dataset.isSuggested = "true";
+      delete elInss.dataset.userEdited;
+      if (document.activeElement === elInss) {
+        elInss.select();
+      }
+    } else if (elInss.dataset.isSuggested === "true") {
+      elInss.value = "";
+      delete elInss.dataset.isSuggested;
+    }
   }
+
   if (elIr && !deveProteger(elIr)) {
-    elIr.value = valores.irrf > 0 ? valores.irrf.toFixed(2) : "";
-    if (valores.irrf > 0) elIr.dataset.lastSeparator = ",";
+    if (valores.irrf > 0) {
+      elIr.value = valores.irrf.toFixed(2);
+      elIr.dataset.lastSeparator = ",";
+      elIr.dataset.isSuggested = "true";
+      delete elIr.dataset.userEdited;
+      if (document.activeElement === elIr) {
+        elIr.select();
+      }
+    } else if (elIr.dataset.isSuggested === "true") {
+      elIr.value = "";
+      delete elIr.dataset.isSuggested;
+    }
   }
 
   if (chkPis && iptPisContainer) {
@@ -289,18 +321,29 @@ export function aplicarValoresSugeridos(valores) {
       if (elPisVal && !deveProteger(elPisVal)) {
         elPisVal.value = valores.pcc.toFixed(2);
         elPisVal.dataset.lastSeparator = ",";
+        elPisVal.dataset.isSuggested = "true";
+        delete elPisVal.dataset.userEdited;
+        if (document.activeElement === elPisVal) {
+          elPisVal.select();
+        }
       }
       if (elPis && !deveProteger(elPis)) {
         elPis.value = valores.val_pis > 0 ? valores.val_pis.toFixed(2) : "";
         if (valores.val_pis > 0) elPis.dataset.lastSeparator = ",";
+        elPis.dataset.isSuggested = "true";
+        delete elPis.dataset.userEdited;
       }
       if (elCofins && !deveProteger(elCofins)) {
         elCofins.value = valores.val_cofins > 0 ? valores.val_cofins.toFixed(2) : "";
         if (valores.val_cofins > 0) elCofins.dataset.lastSeparator = ",";
+        elCofins.dataset.isSuggested = "true";
+        delete elCofins.dataset.userEdited;
       }
       if (elCsll && !deveProteger(elCsll)) {
         elCsll.value = valores.val_csll > 0 ? valores.val_csll.toFixed(2) : "";
         if (valores.val_csll > 0) elCsll.dataset.lastSeparator = ",";
+        elCsll.dataset.isSuggested = "true";
+        delete elCsll.dataset.userEdited;
       }
     } else {
       const algumProtegido = deveProteger(elPisVal) || deveProteger(elPis) || deveProteger(elCofins) || deveProteger(elCsll);
@@ -308,22 +351,13 @@ export function aplicarValoresSugeridos(valores) {
         chkPis.checked = false;
         iptPisContainer.classList.add("hidden");
         iptPisContainer.classList.remove("flex");
-        if (elPisVal) {
-          elPisVal.value = "";
-          delete elPisVal.dataset.lastSeparator;
-        }
-        if (elPis) {
-          elPis.value = "";
-          delete elPis.dataset.lastSeparator;
-        }
-        if (elCofins) {
-          elCofins.value = "";
-          delete elCofins.dataset.lastSeparator;
-        }
-        if (elCsll) {
-          elCsll.value = "";
-          delete elCsll.dataset.lastSeparator;
-        }
+        [elPisVal, elPis, elCofins, elCsll].forEach((el) => {
+          if (el) {
+            el.value = "";
+            delete el.dataset.lastSeparator;
+            delete el.dataset.isSuggested;
+          }
+        });
       }
     }
   }
@@ -346,22 +380,74 @@ export async function predizerEncargos() {
 
   if (!iptCnpj || !iptValorBruto || !iptCondominio) return;
 
-  const rawCnpj = iptCnpj.value.replace(/[^\d]+/g, "").padStart(14, "0");
+  const cleanDigits = iptCnpj.value.replace(/[^\d]+/g, "");
+  const rawCnpj14 = cleanDigits.padStart(14, "0");
+  const unpadded = cleanDigits.replace(/^0+/, "");
+  const masked = mascararCNPJ(rawCnpj14);
+  const cnpjsPossiveis = Array.from(new Set([rawCnpj14, cleanDigits, unpadded, masked].filter(Boolean)));
+
   const valorBruto = parseFloat(iptValorBruto.value) || 0;
   const codCond = iptCondominio.value.trim();
 
   // O gatilho de busca deve ocorrer de forma assíncrona assim que o usuário preencher o CNPJ e o Valor Bruto da nota atual.
-  if (!rawCnpj || rawCnpj.length < 14 || valorBruto <= 0 || !codCond) {
+  if (cleanDigits.length < 11 || valorBruto <= 0 || !codCond) {
     return;
   }
 
+  const codCondStr = codCond.toUpperCase();
+  const codCondNum = parseInt(codCondStr, 10);
+  const condsPossiveis = Array.from(
+    new Set(
+      [
+        codCondStr,
+        !isNaN(codCondNum) ? String(codCondNum) : null,
+        !isNaN(codCondNum) ? String(codCondNum).padStart(3, "0") : null,
+      ].filter(Boolean),
+    ),
+  );
+
   try {
-    // REGRA 1 (Mesmo Condomínio, Mesmo Valor Bruto)
+    // 0. Tenta primeiro verificar notas em memória local (0ms de latência)
+    if (window.dbNotas && window.dbNotas.length > 0) {
+      const notaMemoriaExata = window.dbNotas.find((n) => {
+        const nCnpj = String(n.cnpj || "").replace(/[^\d]+/g, "");
+        const nCond = String(n.codCond || "").trim().toUpperCase();
+        const nBruto = parseFloat(n.valor) || 0;
+        return (
+          cnpjsPossiveis.some((c) => String(c).replace(/[^\d]+/g, "") === nCnpj) &&
+          condsPossiveis.includes(nCond) &&
+          Math.abs(nBruto - valorBruto) < 0.01
+        );
+      });
+
+      if (notaMemoriaExata) {
+        const vPis = parseFloat(notaMemoriaExata.valPIS ?? 0) || 0;
+        const vCofins = parseFloat(notaMemoriaExata.valCOFINS ?? 0) || 0;
+        const vCsll = parseFloat(notaMemoriaExata.valCSLL ?? 0) || 0;
+        let pccVal = parseFloat(notaMemoriaExata.pisDigitado ?? 0) || 0;
+        if (vPis > 0 || vCofins > 0 || vCsll > 0) {
+          pccVal = Math.round((vPis + vCofins + vCsll) * 100) / 100;
+        }
+
+        aplicarValoresSugeridos({
+          inss: parseFloat(notaMemoriaExata.inss ?? 0) || 0,
+          iss: parseFloat(notaMemoriaExata.iss ?? 0) || 0,
+          irrf: parseFloat(notaMemoriaExata.ir ?? 0) || 0,
+          pcc: pccVal,
+          val_pis: vPis,
+          val_cofins: vCofins,
+          val_csll: vCsll,
+        });
+        return;
+      }
+    }
+
+    // REGRA 1 (Mesmo Condomínio, Mesmo CNPJ, Mesmo Valor Bruto)
     const { data: dataR1, error: errorR1 } = await supabase
       .from("notas_fiscais")
       .select("*")
-      .eq("condominio_codigo", codCond)
-      .eq("empresa_cnpj", rawCnpj)
+      .in("condominio_codigo", condsPossiveis)
+      .in("empresa_cnpj", cnpjsPossiveis)
       .eq("valor_bruto", valorBruto)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -372,10 +458,10 @@ export async function predizerEncargos() {
 
     if (dataR1 && dataR1.length > 0) {
       const nota = dataR1[0];
-      const vPis = parseFloat(nota.val_pis) || 0;
-      const vCofins = parseFloat(nota.val_cofins) || 0;
-      const vCsll = parseFloat(nota.val_csll) || 0;
-      let pccVal = parseFloat(nota.pis_digitado) || 0;
+      const vPis = parseFloat(nota.val_pis ?? 0) || 0;
+      const vCofins = parseFloat(nota.val_cofins ?? 0) || 0;
+      const vCsll = parseFloat(nota.val_csll ?? 0) || 0;
+      let pccVal = parseFloat(nota.pis_digitado ?? 0) || 0;
       if (vPis > 0 || vCofins > 0 || vCsll > 0) {
         pccVal = Math.round((vPis + vCofins + vCsll) * 100) / 100;
       } else if (pccVal <= 0) {
@@ -383,61 +469,54 @@ export async function predizerEncargos() {
       }
 
       aplicarValoresSugeridos({
-        inss: parseFloat(nota.inss) || 0,
-        iss: parseFloat(nota.iss) || 0,
-        irrf: parseFloat(nota.ir) || 0,
+        inss: parseFloat(nota.inss ?? nota.valor_inss ?? 0) || 0,
+        iss: parseFloat(nota.iss ?? nota.valor_iss ?? 0) || 0,
+        irrf: parseFloat(nota.ir ?? nota.valor_ir ?? nota.valor_irrf ?? 0) || 0,
         pcc: pccVal,
         val_pis: vPis,
         val_cofins: vCofins,
-        val_csll: vCsll
+        val_csll: vCsll,
       });
       return;
     }
 
-    // REGRA 2 (Outro Condomínio, Valor Bruto Próximo - Range de 20%)
-    const minBruto = valorBruto * 0.8;
-    const maxBruto = valorBruto * 1.2;
-
-    const { data: dataR2, error: errorR2 } = await supabase
+    // REGRA 1.1 (Mesmo Condomínio, Mesmo CNPJ, Qualquer Valor Bruto Anterior - Alíquota Efetiva)
+    const { data: dataR1Cond, error: errorR1Cond } = await supabase
       .from("notas_fiscais")
       .select("*")
-      .eq("empresa_cnpj", rawCnpj)
-      .gte("valor_bruto", minBruto)
-      .lte("valor_bruto", maxBruto)
+      .in("condominio_codigo", condsPossiveis)
+      .in("empresa_cnpj", cnpjsPossiveis)
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (errorR2) {
-      console.error("Erro na busca da Regra 2:", errorR2);
+    if (errorR1Cond) {
+      console.warn("Aviso na busca da Regra 1.1:", errorR1Cond);
     }
 
-    if (dataR2 && dataR2.length > 0) {
-      const nota = dataR2[0];
-      const vPis = parseFloat(nota.val_pis) || 0;
-      const vCofins = parseFloat(nota.val_cofins) || 0;
-      const vCsll = parseFloat(nota.val_csll) || 0;
-      let pccVal = parseFloat(nota.pis_digitado) || 0;
+    if (dataR1Cond && dataR1Cond.length > 0) {
+      const nota = dataR1Cond[0];
+      const vPis = parseFloat(nota.val_pis ?? 0) || 0;
+      const vCofins = parseFloat(nota.val_cofins ?? 0) || 0;
+      const vCsll = parseFloat(nota.val_csll ?? 0) || 0;
+      let pccVal = parseFloat(nota.pis_digitado ?? 0) || 0;
       if (vPis > 0 || vCofins > 0 || vCsll > 0) {
         pccVal = Math.round((vPis + vCofins + vCsll) * 100) / 100;
-      } else if (pccVal <= 0) {
-        pccVal = 0;
       }
-      
+
       const notaAmostraEncontrada = {
         valor_bruto: parseFloat(nota.valor_bruto) || 0,
-        valor_inss: parseFloat(nota.inss) || 0,
-        valor_iss: parseFloat(nota.iss) || 0,
-        valor_irrf: parseFloat(nota.ir) || 0,
+        valor_inss: parseFloat(nota.inss ?? nota.valor_inss ?? 0) || 0,
+        valor_iss: parseFloat(nota.iss ?? nota.valor_iss ?? 0) || 0,
+        valor_irrf: parseFloat(nota.ir ?? nota.valor_ir ?? nota.valor_irrf ?? 0) || 0,
         valor_pcc: pccVal,
         val_pis: vPis,
         val_cofins: vCofins,
-        val_csll: vCsll
+        val_csll: vCsll,
       };
 
       const resultado = predizerImpostoPorAmostra(valorBruto, notaAmostraEncontrada);
 
-      // Calcular proporcionalmente os impostos internos do PCC se houver
-      if (resultado.pcc > 0 && notaAmostraEncontrada.valor_pcc > 0) {
+      if (resultado.pcc > 0 && notaAmostraEncontrada.valor_pcc > 0 && notaAmostraEncontrada.valor_bruto > 0) {
         resultado.val_pis = Math.round(((valorBruto * (notaAmostraEncontrada.val_pis / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
         resultado.val_cofins = Math.round(((valorBruto * (notaAmostraEncontrada.val_cofins / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
         resultado.val_csll = Math.round(((valorBruto * (notaAmostraEncontrada.val_csll / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
@@ -452,7 +531,60 @@ export async function predizerEncargos() {
       return;
     }
 
-    // REGRA 3 (Fora do Range ou Sem Histórico)
+    // REGRA 2 (Outro Condomínio, Nota mais recente do mesmo CNPJ - Alíquota Efetiva)
+    const { data: dataR2, error: errorR2 } = await supabase
+      .from("notas_fiscais")
+      .select("*")
+      .in("empresa_cnpj", cnpjsPossiveis)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (errorR2) {
+      console.error("Erro na busca da Regra 2:", errorR2);
+    }
+
+    if (dataR2 && dataR2.length > 0) {
+      const nota = dataR2[0];
+      const vPis = parseFloat(nota.val_pis ?? 0) || 0;
+      const vCofins = parseFloat(nota.val_cofins ?? 0) || 0;
+      const vCsll = parseFloat(nota.val_csll ?? 0) || 0;
+      let pccVal = parseFloat(nota.pis_digitado ?? 0) || 0;
+      if (vPis > 0 || vCofins > 0 || vCsll > 0) {
+        pccVal = Math.round((vPis + vCofins + vCsll) * 100) / 100;
+      } else if (pccVal <= 0) {
+        pccVal = 0;
+      }
+
+      const notaAmostraEncontrada = {
+        valor_bruto: parseFloat(nota.valor_bruto) || 0,
+        valor_inss: parseFloat(nota.inss ?? nota.valor_inss ?? 0) || 0,
+        valor_iss: parseFloat(nota.iss ?? nota.valor_iss ?? 0) || 0,
+        valor_irrf: parseFloat(nota.ir ?? nota.valor_ir ?? nota.valor_irrf ?? 0) || 0,
+        valor_pcc: pccVal,
+        val_pis: vPis,
+        val_cofins: vCofins,
+        val_csll: vCsll,
+      };
+
+      const resultado = predizerImpostoPorAmostra(valorBruto, notaAmostraEncontrada);
+
+      // Calcular proporcionalmente os impostos internos do PCC se houver
+      if (resultado.pcc > 0 && notaAmostraEncontrada.valor_pcc > 0 && notaAmostraEncontrada.valor_bruto > 0) {
+        resultado.val_pis = Math.round(((valorBruto * (notaAmostraEncontrada.val_pis / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+        resultado.val_cofins = Math.round(((valorBruto * (notaAmostraEncontrada.val_cofins / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+        resultado.val_csll = Math.round(((valorBruto * (notaAmostraEncontrada.val_csll / notaAmostraEncontrada.valor_bruto)) + Number.EPSILON) * 100) / 100;
+        resultado.pcc = Math.round((resultado.val_pis + resultado.val_cofins + resultado.val_csll) * 100) / 100;
+      } else {
+        resultado.val_pis = 0;
+        resultado.val_cofins = 0;
+        resultado.val_csll = 0;
+      }
+
+      aplicarValoresSugeridos(resultado);
+      return;
+    }
+
+    // REGRA 3 (Sem Histórico)
     aplicarValoresSugeridos({
       inss: 0,
       iss: 0,
@@ -460,9 +592,8 @@ export async function predizerEncargos() {
       pcc: 0,
       val_pis: 0,
       val_cofins: 0,
-      val_csll: 0
+      val_csll: 0,
     });
-
   } catch (error) {
     console.error("Erro ao predizer encargos:", error);
   } finally {
@@ -476,7 +607,12 @@ export function debouncedPredizerEncargos() {
 
   predizerDebounceTimeout = setTimeout(() => {
     predizerEncargos();
-  }, 300);
+  }, 250);
+}
+
+export function executarPredizerEncargosImediato() {
+  clearTimeout(predizerDebounceTimeout);
+  predizerEncargos();
 }
 
 export async function carregarSmartDefaults(cnpjRaw) {
