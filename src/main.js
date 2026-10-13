@@ -13,7 +13,8 @@ import {
   carregarSmartDefaults,
   atualizarStatusConferida,
   predizerEncargos,
-  debouncedPredizerEncargos
+  debouncedPredizerEncargos,
+  executarPredizerEncargosImediato
 } from "./calculosImpostos.js";
 import { 
   formatDateTime, 
@@ -362,22 +363,20 @@ export function limparFormulario(forceClearAll = false) {
     iptCondominio.focus();
   }
 
-  iptNota.value = "";
-  iptDiaEmissao.value = "";
-  iptValorBruto.value = "";
-  iptISS.value = "";
-  iptINSS.value = "";
-  iptIR.value = "";
+  [iptNota, iptDiaEmissao, iptValorBruto, iptISS, iptINSS, iptIR, iptPisVal, iptPIS, iptCOFINS, iptCSLL].forEach((el) => {
+    if (el) {
+      el.value = "";
+      delete el.dataset.lastSeparator;
+      delete el.dataset.userEdited;
+      delete el.dataset.isSuggested;
+    }
+  });
   chkPis.checked = false;
   iptPisContainer.classList.add("hidden");
   iptPisContainer.classList.remove("flex");
   getEl("boxPccTotal").classList.remove("hidden");
   getEl("boxPccManual").classList.remove("grid");
   getEl("boxPccManual").classList.add("hidden");
-  iptPisVal.value = "";
-  iptPIS.value = "";
-  iptCOFINS.value = "";
-  iptCSLL.value = "";
   window.pisModificadoManualmente = false;
 
   const chkOutros = getEl("chkOutrosMunicipios");
@@ -2905,6 +2904,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
   [iptValorBruto, iptISS, iptINSS, iptIR, iptPIS, iptCOFINS, iptCSLL, iptPisVal].forEach(travarDuasCasasDecimais);
 
+  [iptISS, iptINSS, iptIR, iptPIS, iptCOFINS, iptCSLL, iptPisVal].forEach((input) => {
+    if (input) {
+      input.addEventListener("input", function () {
+        this.dataset.userEdited = "true";
+        delete this.dataset.isSuggested;
+      });
+    }
+  });
+
   [iptValorBruto, iptISS, iptINSS, iptIR].forEach((input) => {
     if (input) input.addEventListener("input", recalcularValorLiquido);
   });
@@ -3294,6 +3302,10 @@ window.addEventListener("DOMContentLoaded", () => {
         if (el.tagName === "BUTTON") {
           return;
         }
+
+        if (el.id === "iptValorBruto" && parseFloat(el.value) > 0) {
+          executarPredizerEncargosImediato();
+        }
         
         e.preventDefault();
         const visibleElements = getVisibleList();
@@ -3639,7 +3651,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (iptValorBruto) {
     iptValorBruto.addEventListener("input", function () {
+      [iptISS, iptINSS, iptIR, iptPisVal, iptPIS, iptCOFINS, iptCSLL].forEach((el) => {
+        if (el && el.dataset.isSuggested === "true") {
+          delete el.dataset.userEdited;
+        }
+      });
       debouncedPredizerEncargos();
+    });
+
+    iptValorBruto.addEventListener("blur", function () {
+      if (parseFloat(this.value) > 0) {
+        executarPredizerEncargosImediato();
+      }
     });
   }
 
